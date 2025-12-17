@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerPoint Template Populator - Test UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        input[type="file"]:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .example-data {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            margin-top: 10px;
+        }
+
+        .example-data pre {
+            margin: 0;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading .spinner {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>PowerPoint Template Populator</h1>
+            <p>Upload a template, provide data, and generate your populated PowerPoint</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <strong>ℹ️ How to use:</strong> Upload your PowerPoint template, enter the data in JSON format, and click "Generate PowerPoint" to create your populated presentation.
+            </div>
+
+            <form id="pptForm">
+                <div class="section">
+                    <div class="section-title">1. Service Configuration</div>
+                    <div class="form-group">
+                        <label for="serviceUrl">Service URL</label>
+                        <input
+                            type="text"
+                            id="serviceUrl"
+                            placeholder="http://localhost:8000 or https://your-app.up.railway.app"
+                            value="http://localhost:8000"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">2. Upload PowerPoint Template</div>
+                    <div class="form-group">
+                        <label for="template">Choose Template File (.pptx)</label>
+                        <input
+                            type="file"
+                            id="template"
+                            accept=".pptx"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">3. Enter Data (JSON Format)</div>
+                    <div class="form-group">
+                        <label for="data">Data to Populate</label>
+                        <textarea
+                            id="data"
+                            placeholder='Enter JSON data here...'
+                            required
+                        >{
+  "slide_title": "VALUE ACTION PLAN TO MITIGATE RISKS",
+  "role_name": "Chief Marketing Officer",
+  "talent_name": "John Smith",
+  "risk_action_table": [
+    ["1", "Alignment of marketing with businesses", "Align with BUs on the must-wins"],
+    ["2", "Role clarity on swim lanes NA - Global", "Strengthen partnership with Global Marketing"],
+    ["3", "Address Capability Gaps in marketing", "Establish OKRs that indicate value generation"],
+    ["4", "Personal networks and ability to influence", "Finalize executive coaching assignment"]
+  ]
+}</textarea>
+                    </div>
+
+                    <div class="example-data">
+                        <strong>Example format:</strong>
+                        <pre>{
+  "slide_title": "Your Title",
+  "role_name": "Role Name",
+  "talent_name": "Person Name",
+  "risk_action_table": [
+    ["Col1", "Col2", "Col3"],
+    ["Data1", "Data2", "Data3"]
+  ]
+}</pre>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn-secondary" onclick="resetForm()">Reset</button>
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        Generate PowerPoint
+                        <span class="spinner"></span>
+                    </button>
+                </div>
+            </form>
+
+            <div id="status" class="status"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('pptForm');
+        const statusDiv = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const serviceUrl = document.getElementById('serviceUrl').value.trim();
+            const templateFile = document.getElementById('template').files[0];
+            const dataText = document.getElementById('data').value;
+
+            // Validate inputs
+            if (!templateFile) {
+                showStatus('error', 'Please select a template file');
+                return;
+            }
+
+            // Validate JSON
+            let dataJson;
+            try {
+                dataJson = JSON.parse(dataText);
+            } catch (e) {
+                showStatus('error', 'Invalid JSON format: ' + e.message);
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            showStatus('info', 'Generating PowerPoint... Please wait.');
+
+            try {
+                // Create FormData
+                const formData = new FormData();
+                formData.append('template', templateFile);
+                formData.append('data', JSON.stringify(dataJson));
+
+                // Make request
+                const response = await fetch(`${serviceUrl}/populate-pptx`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error: ${response.status} - ${errorText}`);
+                }
+
+                // Get the file
+                const blob = await response.blob();
+                const filename = 'populated_presentation.pptx';
+
+                // Download the file
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // Get message from header
+                const message = response.headers.get('X-Population-Message') || 'Success!';
+                showStatus('success', `✓ ${message}\n\nFile downloaded: ${filename}`);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('error', `✗ Error: ${error.message}\n\nMake sure the service is running and the URL is correct.`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+            }
+        });
+
+        function showStatus(type, message) {
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function resetForm() {
+            form.reset();
+            statusDiv.style.display = 'none';
+            document.getElementById('serviceUrl').value = 'http://localhost:8000';
+        }
+    </script>
+</body>
+</html>
