@@ -247,7 +247,7 @@
 
         <div class="content">
             <div class="info-box">
-                <strong>ℹ️ How to use:</strong> Upload your PowerPoint template, enter the data in JSON format, and click "Generate PowerPoint" to create your populated presentation.
+                <strong>ℹ️ How to use:</strong> First, use the <a href="/extract.html" style="color: #667eea; text-decoration: underline;">Extract Data</a> page to get JSON from your template. Then paste the extracted JSON here, modify the values, and click "Generate PowerPoint" to create your populated presentation.
             </div>
 
             <form id="pptForm">
@@ -284,32 +284,9 @@
                         <label for="data">Data to Populate</label>
                         <textarea
                             id="data"
-                            placeholder='Enter JSON data here...'
+                            placeholder='Paste your extracted JSON here. Use the Extract Data page to get JSON from your template.'
                             required
-                        >{
-  "slide_title": "VALUE ACTION PLAN TO MITIGATE RISKS",
-  "role_name": "Chief Marketing Officer",
-  "talent_name": "John Smith",
-  "risk_action_table": [
-    ["1", "Alignment of marketing with businesses", "Align with BUs on the must-wins"],
-    ["2", "Role clarity on swim lanes NA - Global", "Strengthen partnership with Global Marketing"],
-    ["3", "Address Capability Gaps in marketing", "Establish OKRs that indicate value generation"],
-    ["4", "Personal networks and ability to influence", "Finalize executive coaching assignment"]
-  ]
-}</textarea>
-                    </div>
-
-                    <div class="example-data">
-                        <strong>Example format:</strong>
-                        <pre>{
-  "slide_title": "Your Title",
-  "role_name": "Role Name",
-  "talent_name": "Person Name",
-  "risk_action_table": [
-    ["Col1", "Col2", "Col3"],
-    ["Data1", "Data2", "Data3"]
-  ]
-}</pre>
+                        ></textarea>
                     </div>
                 </div>
 
