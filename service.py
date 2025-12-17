@@ -237,6 +237,136 @@ async def populate_pptx(
         )
 
 
+@app.post("/extract-data")
+async def extract_data(
+    presentation: UploadFile = File(..., description="PowerPoint file (.pptx) to extract data from"),
+    slide_index: Optional[int] = Form(None, description="Slide index to extract from (default: extract all slides)"),
+    extract_all: Optional[bool] = Form(False, description="Extract data from all slides")
+):
+    """
+    Extract data from a PowerPoint presentation to JSON format.
+
+    This is the reverse operation of /populate-pptx - it reads a PowerPoint
+    file and extracts all text and table data into JSON format.
+
+    Use cases:
+    - Convert existing presentations to data
+    - Create JSON templates from real presentations
+    - Extract data for analysis or migration
+
+    Returns JSON with shape names as keys and extracted content as values.
+    """
+    # Validate file
+    if not presentation.filename.endswith('.pptx'):
+        raise HTTPException(status_code=400, detail="File must be a .pptx file")
+
+    # Create temporary directory for processing
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+
+        # Save uploaded file
+        pptx_path = temp_dir_path / "presentation.pptx"
+        with open(pptx_path, "wb") as f:
+            shutil.copyfileobj(presentation.file, f)
+
+        try:
+            prs = Presentation(pptx_path)
+
+            if len(prs.slides) == 0:
+                raise HTTPException(status_code=400, detail="No slides found in presentation")
+
+            # Extract from all slides or specific slide
+            if extract_all or slide_index is None:
+                # Extract from all slides
+                all_slides_data = []
+
+                for slide_idx, slide in enumerate(prs.slides):
+                    slide_data = {
+                        "slide_index": slide_idx,
+                        "shapes": {}
+                    }
+
+                    for shape in slide.shapes:
+                        shape_name = shape.name
+
+                        if shape.has_table:
+                            # Extract table data
+                            table = shape.table
+                            table_data = []
+                            for row in table.rows:
+                                row_data = [cell.text for cell in row.cells]
+                                table_data.append(row_data)
+
+                            slide_data["shapes"][shape_name] = {
+                                "type": "table",
+                                "data": table_data
+                            }
+                        else:
+                            # Extract text data
+                            text = None
+                            if hasattr(shape, "text_frame"):
+                                text = shape.text_frame.text
+                            elif hasattr(shape, "text"):
+                                text = shape.text
+
+                            if text:
+                                slide_data["shapes"][shape_name] = {
+                                    "type": "text",
+                                    "data": text
+                                }
+
+                    all_slides_data.append(slide_data)
+
+                return {
+                    "filename": presentation.filename,
+                    "total_slides": len(prs.slides),
+                    "slides": all_slides_data
+                }
+
+            else:
+                # Extract from specific slide
+                if slide_index >= len(prs.slides):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Slide index {slide_index} out of range (presentation has {len(prs.slides)} slides)"
+                    )
+
+                slide = prs.slides[slide_index]
+                extracted_data = {}
+
+                for shape in slide.shapes:
+                    shape_name = shape.name
+
+                    if shape.has_table:
+                        # Extract table data
+                        table = shape.table
+                        table_data = []
+                        for row in table.rows:
+                            row_data = [cell.text for cell in row.cells]
+                            table_data.append(row_data)
+                        extracted_data[shape_name] = table_data
+                    else:
+                        # Extract text data
+                        text = None
+                        if hasattr(shape, "text_frame"):
+                            text = shape.text_frame.text
+                        elif hasattr(shape, "text"):
+                            text = shape.text
+
+                        if text:
+                            extracted_data[shape_name] = text
+
+                return {
+                    "filename": presentation.filename,
+                    "slide_index": slide_index,
+                    "total_slides": len(prs.slides),
+                    "data": extracted_data
+                }
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error extracting data: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
