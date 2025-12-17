@@ -271,6 +271,16 @@ async def root():
         """)
 
 
+@app.get("/extract.html")
+async def extract_ui():
+    """Serve the extraction UI."""
+    extract_path = Path(__file__).parent / "extract.html"
+    if extract_path.exists():
+        return FileResponse(extract_path, media_type="text/html")
+    else:
+        return HTMLResponse("<h1>Extract UI not found</h1>", status_code=404)
+
+
 @app.get("/health")
 async def health():
     """Health check for Railway."""
