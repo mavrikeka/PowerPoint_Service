@@ -18,9 +18,16 @@ build/
 *_populated.pptx
 *_output.pptx
 service_test_output.pptx
+multi_slide_output.pptx
+single_slide_output.pptx
 
 # Extracted JSON files
 *_extracted.json
+
+# Validator generated files
+*_definition.json
+*_report.html
+*_fixed.pptx
 
 # Test scripts (temporary test files, not the example client)
 quick_test.py

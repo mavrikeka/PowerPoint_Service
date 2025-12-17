@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Optional
 import shutil
+import copy
 
 app = FastAPI(
     title="PowerPoint Population Service",
@@ -83,6 +84,114 @@ def populate_table(table_shape, data, skip_header=True):
             cell.text = str(cell_value)
 
     return True
+
+
+def populate_single_slide(prs, slide, data: dict):
+    """
+    Populate a single slide with data.
+
+    Args:
+        prs: Presentation object
+        slide: Slide object to populate
+        data: Dictionary containing the data to populate
+
+    Returns:
+        List of populated field names
+    """
+    populated_fields = []
+
+    # Populate text placeholders
+    for key, value in data.items():
+        # Skip table data for now
+        if key.endswith('_table') or isinstance(value, list):
+            continue
+
+        shape = find_shape_by_name(slide, key)
+        if shape:
+            success = populate_text_placeholder(shape, str(value))
+            if success:
+                populated_fields.append(key)
+
+    # Populate tables
+    for key, value in data.items():
+        if key.endswith('_table') and isinstance(value, list):
+            table_shape = find_shape_by_name(slide, key)
+            if table_shape:
+                # Check if first row should be treated as header
+                skip_header = data.get(f"{key}_skip_header", True)
+                success = populate_table(table_shape, value, skip_header=skip_header)
+                if success:
+                    populated_fields.append(key)
+
+    return populated_fields
+
+
+def populate_multi_slide(template_file, output_file, slides_data: list):
+    """
+    Populate multiple slides from a template.
+
+    Args:
+        template_file: Path to the template PPTX file
+        output_file: Path to save the populated PPTX file
+        slides_data: List of dicts with 'slide_index' and 'data' keys
+
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    try:
+        # Load the template
+        template_prs = Presentation(template_file)
+
+        if len(template_prs.slides) == 0:
+            return False, "Template has no slides"
+
+        # Create a new presentation for output
+        output_prs = Presentation()
+        output_prs.slide_width = template_prs.slide_width
+        output_prs.slide_height = template_prs.slide_height
+
+        total_fields = 0
+        slides_created = 0
+
+        for item in slides_data:
+            slide_index = item.get('slide_index', 0)
+            data = item.get('data', {})
+
+            # Validate slide index
+            if slide_index >= len(template_prs.slides):
+                continue  # Skip invalid indices
+
+            # Get the template slide
+            template_slide = template_prs.slides[slide_index]
+
+            # Copy the slide layout and add to output
+            # We need to duplicate the slide by copying its layout and shapes
+            slide_layout = template_slide.slide_layout
+
+            # Add a new slide with a blank layout
+            blank_layout = output_prs.slide_layouts[6] if len(output_prs.slide_layouts) > 6 else output_prs.slide_layouts[0]
+            new_slide = output_prs.slides.add_slide(blank_layout)
+
+            # Copy all shapes from template to new slide
+            for shape in template_slide.shapes:
+                # Create a copy of the shape on the new slide
+                el = shape.element
+                newel = copy.deepcopy(el)
+                new_slide.shapes._spTree.insert_element_before(newel, 'p:extLst')
+
+            # Populate the new slide
+            populated_fields = populate_single_slide(output_prs, new_slide, data)
+            total_fields += len(populated_fields)
+            slides_created += 1
+
+        # Save the output presentation
+        output_prs.save(output_file)
+
+        message = f"Successfully created {slides_created} slide(s), populated {total_fields} total fields"
+        return True, message
+
+    except Exception as e:
+        return False, f"Error processing multi-slide template: {str(e)}"
 
 
 def populate_presentation_from_data(template_file, output_file, data: dict, slide_index: int = 0):
@@ -172,13 +281,15 @@ async def health():
 async def populate_pptx(
     template: UploadFile = File(..., description="PowerPoint template file (.pptx)"),
     data: str = Form(..., description="JSON string containing field names and values to populate"),
-    slide_index: Optional[int] = Form(0, description="Slide index to populate (default: 0)"),
+    slide_index: Optional[int] = Form(0, description="Slide index to populate (default: 0, ignored for multi-slide format)"),
     output_filename: Optional[str] = Form("output.pptx", description="Name for the output file")
 ):
     """
     Populate a PowerPoint template with data.
 
-    Example data format:
+    Supports two formats:
+
+    1. Single-slide format (backward compatible):
     {
         "slide_title": "My Title",
         "role_name": "Software Engineer",
@@ -186,6 +297,26 @@ async def populate_pptx(
         "risk_action_table": [
             ["Risk 1", "Action 1", "Owner 1", "Date 1"],
             ["Risk 2", "Action 2", "Owner 2", "Date 2"]
+        ]
+    }
+
+    2. Multi-slide format:
+    {
+        "slides": [
+            {
+                "slide_index": 0,
+                "data": {
+                    "slide_title": "Title 1",
+                    "role_name": "Engineer"
+                }
+            },
+            {
+                "slide_index": 0,
+                "data": {
+                    "slide_title": "Title 2",
+                    "role_name": "Manager"
+                }
+            }
         ]
     }
     """
@@ -211,13 +342,22 @@ async def populate_pptx(
         # Generate output path
         output_path = temp_dir_path / "output.pptx"
 
-        # Populate the presentation
-        success, message = populate_presentation_from_data(
-            str(template_path),
-            str(output_path),
-            data_dict,
-            slide_index
-        )
+        # Detect format and populate accordingly
+        if "slides" in data_dict:
+            # Multi-slide format (Option 1)
+            success, message = populate_multi_slide(
+                str(template_path),
+                str(output_path),
+                data_dict["slides"]
+            )
+        else:
+            # Single-slide format (backward compatible)
+            success, message = populate_presentation_from_data(
+                str(template_path),
+                str(output_path),
+                data_dict,
+                slide_index
+            )
 
         if not success:
             raise HTTPException(status_code=400, detail=message)
