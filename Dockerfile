@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements-service.txt
 
 # Copy application code
 COPY service.py .
+COPY index.html .
 
 # Expose port (Railway will set PORT env variable)
 EXPOSE 8000

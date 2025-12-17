@@ -5,7 +5,7 @@ Upload a template + data, receive a populated PowerPoint file.
 """
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pptx import Presentation
 import json
@@ -146,12 +146,20 @@ def populate_presentation_from_data(template_file, output_file, data: dict, slid
 
 @app.get("/")
 async def root():
-    """Health check endpoint."""
-    return {
-        "service": "PowerPoint Population Service",
-        "status": "running",
-        "version": "1.0.0"
-    }
+    """Serve the test UI."""
+    index_path = Path(__file__).parent / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path, media_type="text/html")
+    else:
+        return HTMLResponse("""
+        <html>
+            <body>
+                <h1>PowerPoint Population Service</h1>
+                <p>Service is running. API endpoint: POST /populate-pptx</p>
+                <p>For API documentation, see <a href="https://github.com/CEO-Works/Create_Powerpoint">GitHub</a></p>
+            </body>
+        </html>
+        """)
 
 
 @app.get("/health")
