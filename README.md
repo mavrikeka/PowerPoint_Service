@@ -59,38 +59,99 @@ Your service will be available at `https://your-app.up.railway.app`
 
 ### Test the Service
 
-#### Web UI (For Testing)
+#### Web UI (Recommended)
 
-A simple web interface is included to test the service visually.
+Two web interfaces are included for testing and using the service:
 
-**To use the test UI:**
+**1. Extract Data UI (`extract.html`)**
+- Upload a PowerPoint file to extract its structure and data
+- Get JSON with exact shape names from your template
+- Choose to extract a single slide or all slides
+- Copy or download the extracted JSON
+
+**2. Populate Template UI (`index.html`)**
+- Upload your PowerPoint template
+- Paste the JSON (from extract or manually created)
+- Generate a populated PowerPoint file
+- Download the result automatically
+
+**To use the UIs:**
 
 1. **Start the service locally:**
    ```bash
    python service.py
    ```
 
-2. **Open `index.html` in your browser:**
-   - Double-click `index.html`, or
-   - Open it with: `open index.html` (macOS) / `start index.html` (Windows)
+2. **Access the UIs:**
+   - Navigate to `http://localhost:8000/` for the Populate UI
+   - Navigate to `http://localhost:8000/extract.html` for the Extract UI
+   - Or open the HTML files directly in your browser
 
-3. **Use the interface:**
-   - Enter service URL (e.g., `http://localhost:8000` or your Railway URL)
-   - Upload your PowerPoint template
-   - Enter JSON data
-   - Click "Generate PowerPoint"
-   - File will download automatically
+**Recommended Workflow:**
+1. Use Extract UI to get JSON structure from your template
+2. Modify the extracted JSON values
+3. Use Populate UI to generate the final presentation
 
-**To deploy the UI:**
-- Host `index.html` on any static hosting (Netlify, Vercel, GitHub Pages)
-- Update the service URL to your Railway URL
-- Share with your team for testing
+**To deploy the UIs:**
+- The service serves both UIs automatically at `/` and `/extract.html`
+- Or host the HTML files on static hosting (Netlify, Vercel, GitHub Pages)
+- Update the default service URL in the HTML files to your Railway URL
 
 ---
 
-### API Endpoint
+### API Endpoints
 
-**POST /populate-pptx**
+#### 1. POST /extract-data
+
+Extract shape names and data from a PowerPoint file to JSON format.
+
+**Request:**
+- Method: `POST`
+- Content-Type: `multipart/form-data`
+- Body:
+  - `presentation` (file): Your .pptx file
+  - `slide_index` (optional, number): Specific slide to extract (0-based)
+  - `extract_all` (optional, boolean): Extract all slides (default: false)
+
+**Response:**
+- Content-Type: `application/json`
+- Body: JSON with shape names as keys and content as values
+
+**Single Slide Example Response:**
+```json
+{
+  "slide_title": "VALUE ACTION PLAN",
+  "role_name": "Chief Marketing Officer",
+  "talent_name": "John Smith",
+  "risk_action_table": [
+    ["Risk", "Action", "Owner", "Date"],
+    ["Risk 1", "Action 1", "Owner 1", "Date 1"]
+  ]
+}
+```
+
+**All Slides Example Response:**
+```json
+{
+  "slides": [
+    {
+      "slide_index": 0,
+      "data": {
+        "slide_title": "Title 1",
+        "content": "Content 1"
+      }
+    },
+    {
+      "slide_index": 1,
+      "data": {
+        "slide_title": "Title 2"
+      }
+    }
+  ]
+}
+```
+
+#### 2. POST /populate-pptx
 
 Upload a PowerPoint template and data to generate a populated presentation.
 
@@ -100,22 +161,44 @@ Upload a PowerPoint template and data to generate a populated presentation.
 - Body:
   - `template` (file): Your .pptx template file
   - `data` (string): JSON string with field names and values
-  - `slide_index` (optional, number): Slide to populate (default: 0)
+  - `slide_index` (optional, number): Slide to populate (default: 0, ignored for multi-slide format)
   - `output_filename` (optional, string): Name for output file (default: "output.pptx")
 
 **Response:**
 - Content-Type: `application/vnd.openxmlformats-officedocument.presentationml.presentation`
 - Body: The populated .pptx file
 
-**Example Data Format:**
+**Single-Slide Format:**
 ```json
 {
   "slide_title": "VALUE ACTION PLAN",
   "role_name": "Chief Marketing Officer",
   "talent_name": "John Smith",
   "risk_action_table": [
-    ["1", "Risk description", "Action to take"],
-    ["2", "Another risk", "Another action"]
+    ["Risk", "Action", "Owner", "Date"],
+    ["Risk 1", "Action 1", "Owner 1", "Date 1"]
+  ]
+}
+```
+
+**Multi-Slide Format (populates multiple slides in one template):**
+```json
+{
+  "slides": [
+    {
+      "slide_index": 0,
+      "data": {
+        "slide_title": "First Title",
+        "role_name": "CTO"
+      }
+    },
+    {
+      "slide_index": 1,
+      "data": {
+        "slide_title": "Second Title",
+        "role_name": "CEO"
+      }
+    }
   ]
 }
 ```
@@ -324,34 +407,53 @@ GeneratePPT/
 ├── venv/                          # Virtual environment (not in git)
 │
 ├── Web Service Files:
-├── service.py                     # FastAPI web service
+├── service.py                     # FastAPI web service (extract + populate endpoints)
 ├── requirements-service.txt       # Service dependencies
 ├── Dockerfile                     # Docker container config for Railway
 ├── railway.json                   # Railway deployment configuration
 ├── test_client.py                 # Example Python client for testing service
-├── index.html                     # 🌐 Web UI for testing the service
+├── index.html                     # 🌐 Web UI for populating templates
+├── extract.html                   # 🌐 Web UI for extracting data from PowerPoint
 │
 ├── Documentation:
 ├── README.md                      # This file - Quick start guide
-├── API_DOCUMENTATION.md           # 📖 Complete API integration guide
+├── API_DOCUMENTATION.md           # 📖 Complete API integration guide with examples
 │
 ├── Local Script Files:
 ├── debug_shapes.py                # Debug script to inspect templates
+├── extract_from_ppt.py            # Script to extract data from PowerPoint
 ├── populate_ppt.py                # Main script to populate templates locally
 ├── create_sample_template.py      # Creates a sample template with named shapes
+├── validate_template.py           # Validates PowerPoint template structure
+├── test_multi_slide.py            # Test script for multi-slide functionality
 ├── requirements.txt               # Local script dependencies
 │
-├── Template Files:
-├── valueactionplan_template.pptx  # Sample template with named shapes
+├── Template Files (Examples):
+├── valueactionplan_template.pptx  # Sample single-slide template
+├── ActionPlan.pptx                # Sample action plan template
+├── Template1.pptx                 # Sample multi-slide template (13 slides)
+├── Template2.pptx                 # Sample multi-slide template (13 slides)
 │
 └── .gitignore                     # Git ignore configuration
 ```
 
-**Total:** 14 essential files ready for deployment
+**Total:** 24 files including examples and utilities
+
+## Key Features
+
+- **Extract & Populate Workflow:** Extract JSON from templates, modify values, then populate
+- **Multi-Slide Support:** Populate multiple slides in a single presentation
+- **Table Support:** Automatically populate tables with 2D array data
+- **Web UI Included:** User-friendly interface for extract and populate operations
+- **Template Preservation:** All backgrounds, images, and formatting are preserved
+- **Flexible Deployment:** Run locally or deploy to Railway
+- **REST API:** Easy integration with any language or platform
 
 ## Notes
 
-- The scripts currently work with the first slide of the presentation
-- You can modify the scripts to work with multiple slides
-- The table population expects data as a list of lists (rows and columns)
-- Make sure shape names in your template match the names used in the script
+- Supports both single-slide and multi-slide formats
+- Tables are populated with full data (including headers)
+- Extra rows in tables are automatically cleared
+- All master slides, themes, backgrounds, and images are preserved
+- Shape names must match JSON keys exactly
+- Use the extract endpoint to get correct shape names from your template

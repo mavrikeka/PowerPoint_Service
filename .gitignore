@@ -21,8 +21,22 @@ service_test_output.pptx
 multi_slide_output.pptx
 single_slide_output.pptx
 
-# Extracted JSON files
+# Test and intermediate files
 *_extracted.json
+*_modified.json
+*_validated.json
+*_result.pptx
+*_verify*.json
+*_FIXED.pptx
+test_*.json
+test_*.pptx
+extracted.json
+modified_data.json
+multi_*.json
+multi_*.pptx
+single_*.json
+single_*.pptx
+final_output.pptx
 
 # Validator generated files
 *_definition.json

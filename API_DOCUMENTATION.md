@@ -85,7 +85,90 @@ curl https://your-app.up.railway.app/health
 
 ---
 
-### 2. Populate PowerPoint Template
+### 2. Extract Data from PowerPoint
+
+Extract text and table data from a PowerPoint presentation to JSON format.
+
+**Endpoint:** `POST /extract-data`
+
+**Content-Type:** `multipart/form-data`
+
+#### Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `presentation` | File | Yes | PowerPoint file (.pptx) to extract data from |
+| `slide_index` | Integer | No | Specific slide index to extract (0-based). If not provided, extracts all slides |
+| `extract_all` | Boolean | No | Set to true to extract all slides (default: false) |
+
+#### Request Example
+
+```bash
+# Extract specific slide (default: slide 0)
+curl -X POST https://your-app.up.railway.app/extract-data \
+  -F "presentation=@template.pptx" \
+  -F "slide_index=0"
+
+# Extract all slides
+curl -X POST https://your-app.up.railway.app/extract-data \
+  -F "presentation=@template.pptx" \
+  -F "extract_all=true"
+```
+
+#### Response
+
+**Success (200 OK) - Single Slide:**
+```json
+{
+  "slide_title": "My Presentation Title",
+  "role_name": "Senior Software Engineer",
+  "talent_name": "John Doe",
+  "risk_action_table": [
+    ["Risk", "Action", "Owner", "Date"],
+    ["Risk 1", "Action 1", "Owner 1", "Date 1"],
+    ["Risk 2", "Action 2", "Owner 2", "Date 2"]
+  ]
+}
+```
+
+**Success (200 OK) - All Slides:**
+```json
+{
+  "slides": [
+    {
+      "slide_index": 0,
+      "data": {
+        "slide_title": "Title 1",
+        "content": "Content 1"
+      }
+    },
+    {
+      "slide_index": 1,
+      "data": {
+        "slide_title": "Title 2",
+        "content": "Content 2"
+      }
+    }
+  ]
+}
+```
+
+**Error (400 Bad Request):**
+```json
+{
+  "detail": "File must be a .pptx file"
+}
+```
+
+**Use Cases:**
+- Convert existing presentations to data
+- Create JSON templates from real presentations
+- Extract data for analysis or migration
+- Generate data format for populate endpoint
+
+---
+
+### 3. Populate PowerPoint Template
 
 Upload a PowerPoint template and data to generate a populated presentation.
 
@@ -140,11 +223,57 @@ curl -X POST https://your-app.up.railway.app/populate-pptx \
 
 ### JSON Data Structure
 
-The `data` parameter must be a JSON string with field names matching your template's shape names.
+The `data` parameter must be a JSON string with field names matching your template's shape names. The service supports two formats:
+
+#### Format 1: Single-Slide (Simple)
+
+For populating a single slide:
+
+```json
+{
+  "slide_title": "My Presentation Title",
+  "role_name": "Senior Software Engineer",
+  "talent_name": "John Doe",
+  "risk_action_table": [
+    ["Risk", "Action", "Owner", "Date"],
+    ["Risk 1", "Action 1", "Owner 1", "Date 1"],
+    ["Risk 2", "Action 2", "Owner 2", "Date 2"]
+  ]
+}
+```
+
+#### Format 2: Multi-Slide (Advanced)
+
+For populating multiple slides from the same template:
+
+```json
+{
+  "slides": [
+    {
+      "slide_index": 0,
+      "data": {
+        "slide_title": "First Presentation",
+        "role_name": "CTO",
+        "talent_name": "John Doe"
+      }
+    },
+    {
+      "slide_index": 0,
+      "data": {
+        "slide_title": "Second Presentation",
+        "role_name": "CEO",
+        "talent_name": "Jane Smith"
+      }
+    }
+  ]
+}
+```
+
+**Note:** Multi-slide format creates multiple copies of the template, each populated with different data. This is useful for generating multiple personalized presentations from one template.
 
 #### Text Fields
 
-For simple text placeholders:
+For simple text placeholders, use the shape name as the key:
 
 ```json
 {
@@ -156,46 +285,44 @@ For simple text placeholders:
 
 #### Table Fields
 
-For tables, use a key ending with `_table` and provide data as a 2D array:
+For tables, use the table shape name and provide data as a 2D array (including headers):
 
 ```json
 {
   "risk_action_table": [
-    ["Row 1 Col 1", "Row 1 Col 2", "Row 1 Col 3"],
-    ["Row 2 Col 1", "Row 2 Col 2", "Row 2 Col 3"],
-    ["Row 3 Col 1", "Row 3 Col 2", "Row 3 Col 3"]
+    ["Risk", "Action", "Owner", "Date"],
+    ["Risk 1", "Action 1", "Owner 1", "Date 1"],
+    ["Risk 2", "Action 2", "Owner 2", "Date 2"]
   ]
 }
 ```
 
-**Note:** By default, table data skips the header row (row 0) and starts populating from row 1.
-
-#### Complete Example
-
-```json
-{
-  "slide_title": "Q4 2024 Performance Review",
-  "role_name": "Chief Technology Officer",
-  "talent_name": "Jane Smith",
-  "risk_action_table": [
-    ["1", "Technical debt accumulation", "Implement tech debt sprints", "Q1 2025"],
-    ["2", "Team skill gaps", "Training program", "Q2 2025"],
-    ["3", "Legacy systems", "Migration plan", "Q3 2025"]
-  ]
-}
-```
+**Important Notes:**
+- Table data should include the header row
+- Tables no longer require a `_table` suffix (any shape name works)
+- Extra rows in the template are automatically cleared
+- If you provide fewer rows than the template has, empty rows will be cleared
 
 ### PowerPoint Template Requirements
 
-Your PowerPoint template must have shapes with specific names:
+Your PowerPoint template must have shapes with specific names that match your JSON keys:
 
 1. **Text placeholders:** Name them exactly as they appear in your JSON (e.g., `slide_title`, `role_name`)
-2. **Tables:** Name them with `_table` suffix (e.g., `risk_action_table`)
+2. **Tables:** Name them to match your JSON keys (e.g., `risk_action_table`)
 
 **To name shapes in PowerPoint:**
 1. Select the shape
 2. Open Selection Pane: View → Selection Pane
 3. Double-click the shape name and rename it
+
+**Best Practice - Use Extract Endpoint:**
+Instead of manually inspecting your template, use the `/extract-data` endpoint to:
+1. Extract shape names and structure from your template
+2. Get JSON with the exact format needed for population
+3. Modify the extracted values
+4. Use the modified JSON with `/populate-pptx`
+
+This ensures your JSON keys always match your template's shape names.
 
 ---
 
