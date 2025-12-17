@@ -33,10 +33,32 @@ app.add_middleware(
 
 
 def find_shape_by_name(slide, name):
-    """Find a shape by its name in a slide."""
+    """
+    Find a shape by its name in a slide.
+
+    Handles duplicate shape names with _N suffix (e.g., "object 39_1" for the second "object 39").
+    """
+    # Check if the name has a _N suffix for duplicate handling
+    import re
+    match = re.match(r'^(.+)_(\d+)$', name)
+
+    if match:
+        # Extract base name and index
+        base_name = match.group(1)
+        index = int(match.group(2))
+
+        # Find all shapes with the base name
+        matching_shapes = [s for s in slide.shapes if s.name == base_name]
+
+        # Return the shape at the specified index (if it exists)
+        if index < len(matching_shapes):
+            return matching_shapes[index]
+
+    # Direct name match (no suffix)
     for shape in slide.shapes:
         if shape.name == name:
             return shape
+
     return None
 
 
@@ -70,7 +92,7 @@ def populate_table(table_shape, data, skip_header=True):
     table = table_shape.table
     start_row = 1 if skip_header else 0
 
-    # Populate the table
+    # Populate the table with new data
     for data_idx, row_data in enumerate(data):
         table_row_idx = data_idx + start_row
         if table_row_idx >= len(table.rows):
@@ -82,6 +104,13 @@ def populate_table(table_shape, data, skip_header=True):
 
             cell = table.cell(table_row_idx, col_idx)
             cell.text = str(cell_value)
+
+    # Clear any remaining rows that weren't overwritten
+    rows_populated = len(data) + start_row
+    for row_idx in range(rows_populated, len(table.rows)):
+        for col_idx in range(len(table.columns)):
+            cell = table.cell(row_idx, col_idx)
+            cell.text = ""
 
     return True
 
@@ -102,8 +131,8 @@ def populate_single_slide(prs, slide, data: dict):
 
     # Populate text placeholders
     for key, value in data.items():
-        # Skip table data for now
-        if key.endswith('_table') or isinstance(value, list):
+        # Skip table data (lists will be handled in the table section)
+        if isinstance(value, list):
             continue
 
         shape = find_shape_by_name(slide, key)
@@ -112,13 +141,13 @@ def populate_single_slide(prs, slide, data: dict):
             if success:
                 populated_fields.append(key)
 
-    # Populate tables
+    # Populate tables (any field with list data, regardless of naming)
     for key, value in data.items():
-        if key.endswith('_table') and isinstance(value, list):
+        if isinstance(value, list):
             table_shape = find_shape_by_name(slide, key)
             if table_shape:
-                # Check if first row should be treated as header
-                skip_header = data.get(f"{key}_skip_header", True)
+                # Since extracted data includes the full table with headers, don't skip
+                skip_header = data.get(f"{key}_skip_header", False)
                 success = populate_table(table_shape, value, skip_header=skip_header)
                 if success:
                     populated_fields.append(key)
@@ -427,17 +456,22 @@ async def extract_data(
 
             # Extract from all slides or specific slide
             if extract_all or slide_index is None:
-                # Extract from all slides
+                # Extract from all slides in populate-ready format
                 all_slides_data = []
 
                 for slide_idx, slide in enumerate(prs.slides):
-                    slide_data = {
-                        "slide_index": slide_idx,
-                        "shapes": {}
-                    }
+                    slide_data = {}
+                    shape_name_counters = {}  # Track duplicate shape names
 
                     for shape in slide.shapes:
                         shape_name = shape.name
+
+                        # Handle duplicate shape names by appending index
+                        if shape_name in slide_data:
+                            counter = shape_name_counters.get(shape_name, 1)
+                            unique_name = f"{shape_name}_{counter}"
+                            shape_name_counters[shape_name] = counter + 1
+                            shape_name = unique_name
 
                         if shape.has_table:
                             # Extract table data
@@ -446,11 +480,7 @@ async def extract_data(
                             for row in table.rows:
                                 row_data = [cell.text for cell in row.cells]
                                 table_data.append(row_data)
-
-                            slide_data["shapes"][shape_name] = {
-                                "type": "table",
-                                "data": table_data
-                            }
+                            slide_data[shape_name] = table_data
                         else:
                             # Extract text data
                             text = None
@@ -460,16 +490,15 @@ async def extract_data(
                                 text = shape.text
 
                             if text:
-                                slide_data["shapes"][shape_name] = {
-                                    "type": "text",
-                                    "data": text
-                                }
+                                slide_data[shape_name] = text
 
-                    all_slides_data.append(slide_data)
+                    all_slides_data.append({
+                        "slide_index": slide_idx,
+                        "data": slide_data
+                    })
 
+                # Return populate-ready multi-slide format
                 return {
-                    "filename": presentation.filename,
-                    "total_slides": len(prs.slides),
                     "slides": all_slides_data
                 }
 
@@ -483,9 +512,17 @@ async def extract_data(
 
                 slide = prs.slides[slide_index]
                 extracted_data = {}
+                shape_name_counters = {}  # Track duplicate shape names
 
                 for shape in slide.shapes:
                     shape_name = shape.name
+
+                    # Handle duplicate shape names by appending index
+                    if shape_name in extracted_data:
+                        counter = shape_name_counters.get(shape_name, 1)
+                        unique_name = f"{shape_name}_{counter}"
+                        shape_name_counters[shape_name] = counter + 1
+                        shape_name = unique_name
 
                     if shape.has_table:
                         # Extract table data
@@ -506,12 +543,8 @@ async def extract_data(
                         if text:
                             extracted_data[shape_name] = text
 
-                return {
-                    "filename": presentation.filename,
-                    "slide_index": slide_index,
-                    "total_slides": len(prs.slides),
-                    "data": extracted_data
-                }
+                # Return populate-ready format (just the data, no wrapper)
+                return extracted_data
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error extracting data: {str(e)}")

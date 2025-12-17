@@ -241,8 +241,8 @@
         </div>
 
         <div class="nav-links" style="background: #f8f9fa; padding: 15px 40px; border-bottom: 1px solid #e9ecef; display: flex; gap: 20px;">
-            <a href="index.html" style="color: #667eea; text-decoration: none; font-weight: 500; font-size: 14px;">Populate Template (Current)</a>
-            <a href="extract.html" style="color: #667eea; text-decoration: none; font-weight: 500; font-size: 14px;">Extract Data</a>
+            <a href="/" style="color: #667eea; text-decoration: none; font-weight: 500; font-size: 14px;">Populate Template (Current)</a>
+            <a href="/extract.html" style="color: #667eea; text-decoration: none; font-weight: 500; font-size: 14px;">Extract Data</a>
         </div>
 
         <div class="content">
@@ -334,7 +334,10 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const serviceUrl = document.getElementById('serviceUrl').value.trim();
+            // Remove trailing slash from service URL
+            let serviceUrl = document.getElementById('serviceUrl').value.trim();
+            serviceUrl = serviceUrl.replace(/\/+$/, '');
+
             const templateFile = document.getElementById('template').files[0];
             const dataText = document.getElementById('data').value;
 

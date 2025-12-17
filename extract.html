@@ -319,13 +319,13 @@
         </div>
 
         <div class="nav-links">
-            <a href="index.html">Populate Template</a>
-            <a href="extract.html">Extract Data (Current)</a>
+            <a href="/">Populate Template</a>
+            <a href="/extract.html">Extract Data (Current)</a>
         </div>
 
         <div class="content">
             <div class="info-box">
-                <strong>ℹ️ How to use:</strong> Upload a PowerPoint file and choose whether to extract data from all slides or a specific slide. The extracted JSON will be displayed below and can be downloaded.
+                <strong>ℹ️ How to use:</strong> Upload a PowerPoint file to extract its data as JSON. Use "Specific slide" (default) to get JSON ready to paste into the Populate UI. The extracted JSON can be modified and used to create new presentations.
             </div>
 
             <form id="extractForm">
@@ -362,15 +362,15 @@
                         <label>Extract from:</label>
                         <div class="radio-group">
                             <div class="radio-option">
-                                <input type="radio" id="extractAll" name="extractMode" value="all" checked>
-                                <label for="extractAll">All slides</label>
+                                <input type="radio" id="extractSpecific" name="extractMode" value="specific" checked>
+                                <label for="extractSpecific">Specific slide (Populate-ready)</label>
                             </div>
                             <div class="radio-option">
-                                <input type="radio" id="extractSpecific" name="extractMode" value="specific">
-                                <label for="extractSpecific">Specific slide</label>
+                                <input type="radio" id="extractAll" name="extractMode" value="all">
+                                <label for="extractAll">All slides (Advanced)</label>
                             </div>
                         </div>
-                        <div class="slide-index-input" id="slideIndexInput">
+                        <div class="slide-index-input active" id="slideIndexInput">
                             <label for="slideIndex">Slide Index (0-based)</label>
                             <input
                                 type="number"
@@ -436,7 +436,10 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const serviceUrl = document.getElementById('serviceUrl').value.trim();
+            // Remove trailing slash from service URL
+            let serviceUrl = document.getElementById('serviceUrl').value.trim();
+            serviceUrl = serviceUrl.replace(/\/+$/, '');
+
             const presentationFile = document.getElementById('presentation').files[0];
             const extractMode = document.querySelector('input[name="extractMode"]:checked').value;
             const slideIndex = document.getElementById('slideIndex').value;
@@ -501,12 +504,13 @@
             // Display statistics
             let statsText = '';
             if (data.slides) {
-                // All slides mode
-                statsText = `File: ${data.filename} | Total Slides: ${data.total_slides}`;
-            } else if (data.data) {
+                // Multi-slide mode
+                const totalSlides = data.slides.length;
+                statsText = `Extracted ${totalSlides} slide(s) - Ready for populate`;
+            } else {
                 // Single slide mode
-                const fieldCount = Object.keys(data.data).length;
-                statsText = `File: ${data.filename} | Slide: ${data.slide_index} | Fields: ${fieldCount}`;
+                const fieldCount = Object.keys(data).length;
+                statsText = `Extracted ${fieldCount} field(s) - Ready for populate`;
             }
             resultStats.textContent = statsText;
 
