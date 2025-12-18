@@ -4,6 +4,78 @@ Complete API documentation for integrating the PowerPoint Template Population Se
 
 ---
 
+## Quick Start (5 Minutes)
+
+Get started with the PowerPoint Population Service in minutes:
+
+### Step 1: Extract Template Structure (30 seconds)
+```bash
+# Extract data from your PowerPoint template to see its structure
+curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
+  -F "presentation=@your-template.pptx" \
+  -F "slide_index=0" \
+  > template-structure.json
+```
+
+### Step 2: Modify the Data (2 minutes)
+Edit `template-structure.json` with your actual data:
+```json
+{
+  "slide_title": "Q4 2024 Report",
+  "presenter_name": "Jane Smith",
+  "summary_table": [
+    ["Metric", "Value"],
+    ["Revenue", "$1.2M"],
+    ["Growth", "23%"]
+  ]
+}
+```
+
+### Step 3: Generate PowerPoint (30 seconds)
+```bash
+# Populate the template with your data
+curl -X POST https://createpowerpoint-development.up.railway.app/populate-pptx \
+  -F "template=@your-template.pptx" \
+  -F "data=$(cat template-structure.json)" \
+  -o populated-presentation.pptx
+```
+
+**Done!** You now have a populated PowerPoint presentation.
+
+### Copy-Paste Integration (Python)
+```python
+import requests
+import json
+
+# 1. Extract template structure
+with open('template.pptx', 'rb') as f:
+    response = requests.post(
+        'https://createpowerpoint-development.up.railway.app/extract-data',
+        files={'presentation': f},
+        data={'slide_index': 0}
+    )
+    template_data = response.json()
+
+# 2. Modify the data
+template_data['slide_title'] = 'My Custom Title'
+template_data['presenter_name'] = 'John Doe'
+
+# 3. Generate populated PowerPoint
+with open('template.pptx', 'rb') as f:
+    response = requests.post(
+        'https://createpowerpoint-development.up.railway.app/populate-pptx',
+        files={'template': f},
+        data={'data': json.dumps(template_data)}
+    )
+
+    with open('output.pptx', 'wb') as out:
+        out.write(response.content)
+
+print("Done! Check output.pptx")
+```
+
+---
+
 ## Table of Contents
 
 1. [Overview](#overview)
@@ -15,6 +87,7 @@ Complete API documentation for integrating the PowerPoint Template Population Se
 7. [Error Handling](#error-handling)
 8. [Best Practices](#best-practices)
 9. [Integration Patterns](#integration-patterns)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -46,10 +119,10 @@ http://localhost:8000
 
 ### Production (Railway)
 ```
-https://your-app.up.railway.app
+https://createpowerpoint-development.up.railway.app
 ```
 
-Replace `your-app.up.railway.app` with your actual Railway domain.
+This is the live production API endpoint.
 
 ---
 
@@ -80,7 +153,7 @@ Check if the service is running.
 
 **Example:**
 ```bash
-curl https://your-app.up.railway.app/health
+curl https://createpowerpoint-development.up.railway.app/health
 ```
 
 ---
@@ -105,12 +178,12 @@ Extract text and table data from a PowerPoint presentation to JSON format.
 
 ```bash
 # Extract specific slide (default: slide 0)
-curl -X POST https://your-app.up.railway.app/extract-data \
+curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
   -F "presentation=@template.pptx" \
   -F "slide_index=0"
 
 # Extract all slides
-curl -X POST https://your-app.up.railway.app/extract-data \
+curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
   -F "presentation=@template.pptx" \
   -F "extract_all=true"
 ```
@@ -188,7 +261,7 @@ Upload a PowerPoint template and data to generate a populated presentation.
 #### Request Example
 
 ```bash
-curl -X POST https://your-app.up.railway.app/populate-pptx \
+curl -X POST https://createpowerpoint-development.up.railway.app/populate-pptx \
   -F "template=@template.pptx" \
   -F 'data={"slide_title":"My Title","role_name":"Engineer"}' \
   -o output.pptx
@@ -343,7 +416,7 @@ def populate_powerpoint(template_path, data, service_url, output_path="output.pp
     Args:
         template_path: Path to the template .pptx file
         data: Dictionary with field names and values
-        service_url: URL of the service (e.g., "https://your-app.up.railway.app")
+        service_url: URL of the service (e.g., "https://createpowerpoint-development.up.railway.app")
         output_path: Where to save the populated file
 
     Returns:
@@ -391,7 +464,7 @@ def populate_powerpoint(template_path, data, service_url, output_path="output.pp
 
 # Example usage
 if __name__ == "__main__":
-    service_url = "https://your-app.up.railway.app"
+    service_url = "https://createpowerpoint-development.up.railway.app"
     template_path = "template.pptx"
 
     data = {
@@ -483,7 +556,7 @@ async function populatePowerPoint(templatePath, data, serviceUrl, outputPath = '
 }
 
 // Example usage
-const serviceUrl = 'https://your-app.up.railway.app';
+const serviceUrl = 'https://createpowerpoint-development.up.railway.app';
 const templatePath = './template.pptx';
 
 const data = {
@@ -539,7 +612,7 @@ async function populatePowerPoint(templateFile, data, serviceUrl) {
 // Example usage in browser
 // const fileInput = document.getElementById('fileInput');
 // const file = fileInput.files[0];
-// populatePowerPoint(file, data, 'https://your-app.up.railway.app');
+// populatePowerPoint(file, data, 'https://createpowerpoint-development.up.railway.app');
 ```
 
 ---
@@ -548,13 +621,13 @@ async function populatePowerPoint(templateFile, data, serviceUrl) {
 
 ```bash
 # Basic usage
-curl -X POST https://your-app.up.railway.app/populate-pptx \
+curl -X POST https://createpowerpoint-development.up.railway.app/populate-pptx \
   -F "template=@template.pptx" \
   -F 'data={"slide_title":"My Title","role_name":"Engineer"}' \
   -o output.pptx
 
 # With all parameters
-curl -X POST https://your-app.up.railway.app/populate-pptx \
+curl -X POST https://createpowerpoint-development.up.railway.app/populate-pptx \
   -F "template=@template.pptx" \
   -F 'data={"slide_title":"My Title","role_name":"Engineer","talent_name":"John Doe"}' \
   -F "slide_index=0" \
@@ -563,7 +636,7 @@ curl -X POST https://your-app.up.railway.app/populate-pptx \
   -w "\nStatus: %{http_code}\n"
 
 # Check headers
-curl -X POST https://your-app.up.railway.app/populate-pptx \
+curl -X POST https://createpowerpoint-development.up.railway.app/populate-pptx \
   -F "template=@template.pptx" \
   -F 'data={"slide_title":"Test"}' \
   -o output.pptx \
@@ -621,7 +694,7 @@ function populatePowerPoint($templatePath, $data, $serviceUrl, $outputPath = 'ou
 }
 
 // Example usage
-$serviceUrl = 'https://your-app.up.railway.app';
+$serviceUrl = 'https://createpowerpoint-development.up.railway.app';
 $templatePath = 'template.pptx';
 
 $data = [
@@ -727,7 +800,7 @@ func populatePowerPoint(templatePath string, data map[string]interface{}, servic
 }
 
 func main() {
-    serviceURL := "https://your-app.up.railway.app"
+    serviceURL := "https://createpowerpoint-development.up.railway.app"
     templatePath := "template.pptx"
 
     data := map[string]interface{}{
@@ -1023,6 +1096,304 @@ logging.basicConfig(level=logging.DEBUG)
 ### Testing
 
 Use the included test UI (`index.html`) to test your service before integration.
+
+---
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. "Shape not found" or Fields Not Populating
+
+**Problem:** The API returns success but some fields aren't populated.
+
+**Cause:** Shape names in your JSON don't match the actual shape names in the PowerPoint template.
+
+**Solution:**
+```bash
+# Step 1: Extract data from your template to see the exact shape names
+curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
+  -F "presentation=@your-template.pptx" \
+  -F "slide_index=0" \
+  > template-structure.json
+
+# Step 2: Use the extracted JSON as your data template
+cat template-structure.json
+# This shows you the EXACT shape names to use
+```
+
+**Prevention:** Always use the `/extract-data` endpoint first to get the correct shape names.
+
+---
+
+#### 2. "Invalid JSON" Error
+
+**Problem:** Getting `400 Bad Request` with "Invalid JSON" message.
+
+**Cause:** Malformed JSON in the `data` parameter.
+
+**Solution:**
+```python
+# Validate your JSON before sending
+import json
+
+data = {
+    "slide_title": "My Title",
+    "role_name": "Engineer"
+}
+
+# This will raise an error if JSON is invalid
+json_string = json.dumps(data)
+print(json_string)  # Verify it's valid
+```
+
+**Common JSON mistakes:**
+- Missing quotes around keys or values
+- Trailing commas
+- Single quotes instead of double quotes
+- Unescaped special characters
+
+**Online validator:** Use [jsonlint.com](https://jsonlint.com) to validate your JSON.
+
+---
+
+#### 3. Table Data Not Showing or Overflowing
+
+**Problem:** Table data doesn't appear or overflows cells.
+
+**Causes:**
+- Wrong table shape name
+- Table cells too small for content
+- Missing table data format
+
+**Solutions:**
+
+**a) Verify table name:**
+```bash
+# Extract to see table shape names
+curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
+  -F "presentation=@template.pptx" \
+  -F "slide_index=0"
+```
+
+**b) Format table data correctly:**
+```json
+{
+  "my_table": [
+    ["Header 1", "Header 2", "Header 3"],
+    ["Row 1 Col 1", "Row 1 Col 2", "Row 1 Col 3"],
+    ["Row 2 Col 1", "Row 2 Col 2", "Row 2 Col 3"]
+  ]
+}
+```
+
+**c) Design template with appropriate cell sizes:**
+- PowerPoint doesn't auto-fit table cells
+- Make cells large enough for expected content
+- Enable word wrap in template cells
+- Keep content concise
+
+---
+
+#### 4. Connection Refused / Service Unavailable
+
+**Problem:** Cannot connect to the API.
+
+**Causes:**
+- Service is down
+- Wrong URL
+- Network issues
+- Firewall blocking
+
+**Solutions:**
+
+**a) Check service health:**
+```bash
+curl https://createpowerpoint-development.up.railway.app/health
+# Should return: {"status":"healthy"}
+```
+
+**b) Verify URL:**
+```python
+# Production URL
+SERVICE_URL = "https://createpowerpoint-development.up.railway.app"
+
+# NOT localhost (unless testing locally)
+# SERVICE_URL = "http://localhost:8000"  # Only for local testing
+```
+
+**c) Check Railway status:**
+- Visit [Railway Dashboard](https://railway.app)
+- Check if deployment is active
+- View deployment logs for errors
+
+**d) Test with timeout:**
+```python
+response = requests.post(url, data=data, timeout=30)
+```
+
+---
+
+#### 5. File Downloaded But Won't Open
+
+**Problem:** PowerPoint file downloads but is corrupted or won't open.
+
+**Causes:**
+- Incomplete download
+- Binary data corruption
+- Response not saved correctly
+
+**Solutions:**
+
+**a) Verify binary mode:**
+```python
+# CORRECT - Binary mode
+with open('output.pptx', 'wb') as f:
+    f.write(response.content)
+
+# WRONG - Text mode
+# with open('output.pptx', 'w') as f:
+#     f.write(response.content)
+```
+
+**b) Check response status:**
+```python
+if response.status_code == 200:
+    with open('output.pptx', 'wb') as f:
+        f.write(response.content)
+else:
+    print(f"Error: {response.status_code}")
+    print(response.text)
+```
+
+**c) Verify content type:**
+```python
+content_type = response.headers.get('content-type')
+if 'presentation' in content_type:
+    # Save file
+else:
+    # Error occurred, check response.text
+    print(response.text)
+```
+
+---
+
+#### 6. Multi-Slide Format Not Working
+
+**Problem:** Multi-slide data doesn't populate correctly.
+
+**Cause:** Incorrect JSON structure.
+
+**Solution:**
+```json
+{
+  "slides": [
+    {
+      "slide_index": 0,
+      "data": {
+        "slide_title": "First Slide",
+        "content": "Content 1"
+      }
+    },
+    {
+      "slide_index": 1,
+      "data": {
+        "slide_title": "Second Slide",
+        "content": "Content 2"
+      }
+    }
+  ]
+}
+```
+
+**Key points:**
+- Must have top-level `"slides"` array
+- Each slide must have `"slide_index"` and `"data"`
+- `slide_index` is 0-based (0 = first slide)
+
+---
+
+#### 7. Timeout Errors
+
+**Problem:** Request times out before completing.
+
+**Causes:**
+- Large PowerPoint files
+- Complex templates
+- Slow network
+- Server load
+
+**Solutions:**
+
+**a) Increase timeout:**
+```python
+response = requests.post(
+    url,
+    files=files,
+    data=data,
+    timeout=60  # Increase from default 30 seconds
+)
+```
+
+**b) Optimize template:**
+- Remove unnecessary images
+- Simplify complex graphics
+- Reduce file size
+
+**c) Use async for multiple files:**
+```python
+import asyncio
+import httpx
+
+async def populate_async(template_path, data):
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        # Your code here
+        pass
+```
+
+---
+
+#### 8. Formatting Lost After Population
+
+**Problem:** Text formatting, colors, or fonts change after population.
+
+**Cause:** This is expected behavior. The service replaces text content, which may reset some formatting.
+
+**Solutions:**
+
+**a) Design template with desired formatting:**
+- Set fonts, colors, sizes in the template
+- The service preserves most formatting
+
+**b) What's preserved:**
+- Font family, size, color (from template)
+- Background images and colors
+- Slide layouts and masters
+- Table structure and borders
+
+**c) What may change:**
+- Bold/italic formatting within text
+- Character-level formatting
+- Complex text effects
+
+**Workaround:** Keep formatting simple in templates for consistent results.
+
+---
+
+### Getting Help
+
+Still having issues?
+
+1. **Check the Quick Start** section at the top of this document
+2. **Review Code Examples** for your language
+3. **Test with cURL** to isolate issues
+4. **Use the Web UI** at https://createpowerpoint-development.up.railway.app for visual testing
+5. **Check Railway Logs** if you're self-hosting
+6. **Open a GitHub Issue** with:
+   - What you're trying to do
+   - The error message (if any)
+   - Sample code (redact sensitive data)
+   - Template structure (from `/extract-data`)
 
 ---
 
