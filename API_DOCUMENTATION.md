@@ -1312,12 +1312,47 @@ else:
 - `slide_index` is 0-based (0 = first slide)
 
 **How slide duplication works:**
-- If `slide_index` exists in template: that slide will be populated with the data
-- If `slide_index` doesn't exist: slide 0 will be duplicated and the copy will be populated
-- This allows a single-slide template to generate multi-slide presentations automatically
-- All formatting, backgrounds, and images from the template slide are preserved in duplicates
 
-**Example:** Template with 1 slide can generate 10 slides by specifying slide_index 0-9
+The service uses intelligent slide duplication logic:
+
+1. **First occurrence of slide_index:** Populates the existing template slide at that index
+2. **Second+ occurrences of same slide_index:** Duplicates that template slide and populates the copy
+3. **Non-existent slide_index:** Duplicates slide 0 and populates it
+
+This allows powerful scenarios:
+- **Single template → Multiple slides:** 1-slide template can generate 10 slides (specify slide_index 0 ten times)
+- **Multiple templates → Multiple copies each:** 3-slide template can generate 9 slides (specify slide_index 0, 0, 0, 1, 1, 1, 2, 2, 2)
+- All formatting, backgrounds, and images from template slides are preserved in duplicates
+
+**Example 1:** Generate 3 slides from 1 template
+```json
+{
+  "slides": [
+    {"slide_index": 0, "data": {"title": "Copy 1"}},
+    {"slide_index": 0, "data": {"title": "Copy 2"}},
+    {"slide_index": 0, "data": {"title": "Copy 3"}}
+  ]
+}
+```
+Result: 3 slides total (slide 0 populated + 2 duplicates of slide 0)
+
+**Example 2:** Generate 9 slides from 3 different templates
+```json
+{
+  "slides": [
+    {"slide_index": 0, "data": {"title": "Template A - Copy 1"}},
+    {"slide_index": 0, "data": {"title": "Template A - Copy 2"}},
+    {"slide_index": 0, "data": {"title": "Template A - Copy 3"}},
+    {"slide_index": 1, "data": {"title": "Template B - Copy 1"}},
+    {"slide_index": 1, "data": {"title": "Template B - Copy 2"}},
+    {"slide_index": 1, "data": {"title": "Template B - Copy 3"}},
+    {"slide_index": 2, "data": {"title": "Template C - Copy 1"}},
+    {"slide_index": 2, "data": {"title": "Template C - Copy 2"}},
+    {"slide_index": 2, "data": {"title": "Template C - Copy 3"}}
+  ]
+}
+```
+Result: Template with slides 0, 1, 2 → generates 9 total slides (3 templates × 3 copies each)
 
 ---
 

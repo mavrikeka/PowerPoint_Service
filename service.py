@@ -159,9 +159,13 @@ def populate_multi_slide(template_file, output_file, slides_data: list):
     """
     Populate multiple slides from a template.
 
-    Supports two modes:
-    1. If slide_index exists in template: populate that existing slide
-    2. If slide_index doesn't exist: duplicate slide 0 and populate the copy
+    Supports intelligent slide duplication:
+    1. First occurrence of slide_index: populate that template slide
+    2. Second+ occurrences of same slide_index: duplicate that template slide and populate
+    3. If slide_index doesn't exist in template: duplicate slide 0
+
+    This allows creating multiple copies from different slide templates.
+    Example: 3 slide templates, 3 data items each = 9 total slides
 
     Args:
         template_file: Path to the template PPTX file
@@ -181,19 +185,36 @@ def populate_multi_slide(template_file, output_file, slides_data: list):
         total_fields = 0
         slides_created = 0
 
+        # Track which slide_index values we've seen (for duplication logic)
+        slide_index_usage = {}
+
         # Process each slide data
         for item in slides_data:
             slide_index = item.get('slide_index', 0)
             data = item.get('data', {})
 
-            # Check if this slide index exists in the template
-            if slide_index < len(prs.slides):
-                # Slide exists - populate it in place
+            # Track how many times we've seen this slide_index
+            if slide_index not in slide_index_usage:
+                slide_index_usage[slide_index] = 0
+            else:
+                slide_index_usage[slide_index] += 1
+
+            occurrence_count = slide_index_usage[slide_index]
+
+            # Determine which slide to use or duplicate
+            if slide_index < len(prs.slides) and occurrence_count == 0:
+                # First occurrence - use the template slide at this index
                 slide = prs.slides[slide_index]
             else:
-                # Slide doesn't exist - duplicate slide 0
-                # Get the slide layout from slide 0
-                source_slide = prs.slides[0]
+                # Need to duplicate - either it's a repeat or slide doesn't exist
+                # Determine which slide to use as the source
+                if slide_index < len(prs.slides):
+                    # Duplicate the template slide at this index
+                    source_slide = prs.slides[slide_index]
+                else:
+                    # slide_index doesn't exist in template, duplicate slide 0
+                    source_slide = prs.slides[0]
+
                 slide_layout = source_slide.slide_layout
 
                 # Create a new slide with the same layout
