@@ -1311,6 +1311,14 @@ else:
 - Each slide must have `"slide_index"` and `"data"`
 - `slide_index` is 0-based (0 = first slide)
 
+**How slide duplication works:**
+- If `slide_index` exists in template: that slide will be populated with the data
+- If `slide_index` doesn't exist: slide 0 will be duplicated and the copy will be populated
+- This allows a single-slide template to generate multi-slide presentations automatically
+- All formatting, backgrounds, and images from the template slide are preserved in duplicates
+
+**Example:** Template with 1 slide can generate 10 slides by specifying slide_index 0-9
+
 ---
 
 #### 7. Timeout Errors
