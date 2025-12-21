@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Optional
 import shutil
+from copy import deepcopy
 
 app = FastAPI(
     title="PowerPoint Population Service",
@@ -158,6 +159,10 @@ def populate_multi_slide(template_file, output_file, slides_data: list):
     """
     Populate multiple slides from a template.
 
+    Supports two modes:
+    1. If slide_index exists in template: populate that existing slide
+    2. If slide_index doesn't exist: duplicate slide 0 and populate the copy
+
     Args:
         template_file: Path to the template PPTX file
         output_file: Path to save the populated PPTX file
@@ -174,25 +179,50 @@ def populate_multi_slide(template_file, output_file, slides_data: list):
             return False, "Template has no slides"
 
         total_fields = 0
+        slides_created = 0
 
-        # Populate each slide in place (preserves all formatting, backgrounds, images, etc.)
+        # Process each slide data
         for item in slides_data:
             slide_index = item.get('slide_index', 0)
             data = item.get('data', {})
 
-            # Validate slide index
-            if slide_index >= len(prs.slides):
-                continue  # Skip invalid indices
+            # Check if this slide index exists in the template
+            if slide_index < len(prs.slides):
+                # Slide exists - populate it in place
+                slide = prs.slides[slide_index]
+            else:
+                # Slide doesn't exist - duplicate slide 0
+                # Get the slide layout from slide 0
+                source_slide = prs.slides[0]
+                slide_layout = source_slide.slide_layout
 
-            # Get the slide and populate it in place
-            slide = prs.slides[slide_index]
+                # Create a new slide with the same layout
+                new_slide = prs.slides.add_slide(slide_layout)
+
+                # Copy all shapes from source slide to new slide
+                for shape in source_slide.shapes:
+                    # Get the shape element
+                    el = shape.element
+                    # Create a copy of the shape element
+                    newel = deepcopy(el)
+                    # Add it to the new slide
+                    new_slide.shapes._spTree.insert_element_before(newel, 'p:extLst')
+
+                slide = new_slide
+                slides_created += 1
+
+            # Populate the slide
             populated_fields = populate_single_slide(prs, slide, data)
             total_fields += len(populated_fields)
 
         # Save the modified presentation
         prs.save(output_file)
 
-        message = f"Successfully populated {len(slides_data)} slide(s), modified {total_fields} total fields"
+        if slides_created > 0:
+            message = f"Successfully created {slides_created} new slide(s), populated {len(slides_data)} total slide(s), modified {total_fields} total fields"
+        else:
+            message = f"Successfully populated {len(slides_data)} slide(s), modified {total_fields} total fields"
+
         return True, message
 
     except Exception as e:
