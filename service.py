@@ -329,6 +329,17 @@ def populate_multi_slide(template_file, output_file, slides_data: list):
                 # Create a new slide with the same layout
                 new_slide = prs.slides.add_slide(slide_layout)
 
+                # Remove default placeholder shapes added by add_slide
+                # These are unwanted "Title 1", "Content Placeholder 2", etc.
+                shapes_to_remove = []
+                for shape in new_slide.shapes:
+                    if hasattr(shape, 'is_placeholder') and shape.is_placeholder:
+                        shapes_to_remove.append(shape)
+
+                for shape in shapes_to_remove:
+                    sp = shape.element
+                    sp.getparent().remove(sp)
+
                 # Copy all shapes from source slide to new slide
                 for shape in source_slide.shapes:
                     # Get the shape element
