@@ -191,17 +191,34 @@ curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
 #### Response
 
 **Success (200 OK) - Single Slide:**
+
+The extract endpoint now returns an **ordered array** that preserves the exact order of elements as they appear on the slide. Each element includes:
+- `name`: The shape name from PowerPoint
+- `type`: Either "text" or "table"
+- `content`: The actual content (string for text, 2D array for tables)
+
 ```json
-{
-  "slide_title": "My Presentation Title",
-  "role_name": "Senior Software Engineer",
-  "talent_name": "John Doe",
-  "risk_action_table": [
-    ["Risk", "Action", "Owner", "Date"],
-    ["Risk 1", "Action 1", "Owner 1", "Date 1"],
-    ["Risk 2", "Action 2", "Owner 2", "Date 2"]
-  ]
-}
+[
+  {
+    "name": "slide_title",
+    "type": "text",
+    "content": "My Presentation Title"
+  },
+  {
+    "name": "role_name",
+    "type": "text",
+    "content": "Senior Software Engineer"
+  },
+  {
+    "name": "risk_action_table",
+    "type": "table",
+    "content": [
+      ["Risk", "Action", "Owner", "Date"],
+      ["Risk 1", "Action 1", "Owner 1", "Date 1"],
+      ["Risk 2", "Action 2", "Owner 2", "Date 2"]
+    ]
+  }
+]
 ```
 
 **Success (200 OK) - All Slides:**
@@ -210,21 +227,43 @@ curl -X POST https://createpowerpoint-development.up.railway.app/extract-data \
   "slides": [
     {
       "slide_index": 0,
-      "data": {
-        "slide_title": "Title 1",
-        "content": "Content 1"
-      }
+      "shapes": [
+        {
+          "name": "slide_title",
+          "type": "text",
+          "content": "Title 1"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "content": "Content 1"
+        }
+      ]
     },
     {
       "slide_index": 1,
-      "data": {
-        "slide_title": "Title 2",
-        "content": "Content 2"
-      }
+      "shapes": [
+        {
+          "name": "slide_title",
+          "type": "text",
+          "content": "Title 2"
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "content": "Content 2"
+        }
+      ]
     }
   ]
 }
 ```
+
+**Key Changes (v2.0):**
+- Single-slide extraction now returns an ordered array instead of an object
+- Multi-slide extraction uses `"shapes"` key instead of `"data"`
+- Order of elements is preserved as they appear on the slide (z-order)
+- Each element has explicit `type` and `name` fields
 
 **Error (400 Bad Request):**
 ```json
@@ -1313,16 +1352,23 @@ else:
 
 **How slide duplication works:**
 
-The service uses intelligent slide duplication logic:
+The service uses intelligent slide duplication logic with automatic placeholder cleanup:
 
 1. **First occurrence of slide_index:** Populates the existing template slide at that index
 2. **Second+ occurrences of same slide_index:** Duplicates that template slide and populates the copy
 3. **Non-existent slide_index:** Duplicates slide 0 and populates it
 
+**Duplicate Slide Behavior (v2.0+):**
+- When creating a duplicate slide, the service automatically removes default placeholder shapes (e.g., "Title 1", "Content Placeholder 2") that PowerPoint adds from the slide layout
+- Only the actual content shapes from your template are copied to the duplicate
+- This prevents unwanted placeholder elements from appearing in duplicated slides
+- **Note:** If your original template slide contains placeholder shapes, you should remove them manually from the template before using the service
+
 This allows powerful scenarios:
 - **Single template → Multiple slides:** 1-slide template can generate 10 slides (specify slide_index 0 ten times)
 - **Multiple templates → Multiple copies each:** 3-slide template can generate 9 slides (specify slide_index 0, 0, 0, 1, 1, 1, 2, 2, 2)
-- All formatting, backgrounds, and images from template slides are preserved in duplicates
+- All formatting, backgrounds, images, and shapes from template slides are preserved in duplicates
+- No unwanted placeholders in duplicated slides
 
 **Example 1:** Generate 3 slides from 1 template
 ```json
@@ -1396,30 +1442,42 @@ async def populate_async(template_path, data):
 
 ---
 
-#### 8. Formatting Lost After Population
+#### 8. Font Formatting Preservation
 
-**Problem:** Text formatting, colors, or fonts change after population.
+**Behavior (v2.0+):** The service now **preserves font formatting** from your template when populating text and tables.
 
-**Cause:** This is expected behavior. The service replaces text content, which may reset some formatting.
-
-**Solutions:**
-
-**a) Design template with desired formatting:**
-- Set fonts, colors, sizes in the template
-- The service preserves most formatting
-
-**b) What's preserved:**
-- Font family, size, color (from template)
+**What's Preserved:**
+- Font name/family (e.g., Arial, Times New Roman)
+- Font size (e.g., 24pt, 18pt)
+- Bold and italic styling
+- Underline formatting
+- Font color (RGB and theme colors)
 - Background images and colors
 - Slide layouts and masters
-- Table structure and borders
+- Table structure, borders, and cell formatting
 
-**c) What may change:**
-- Bold/italic formatting within text
-- Character-level formatting
-- Complex text effects
+**How It Works:**
+1. Service reads the existing font properties from the first text run in each shape
+2. Replaces the text content with your data
+3. Restores the original font properties to the new text
 
-**Workaround:** Keep formatting simple in templates for consistent results.
+**Example:**
+```python
+# Template has "Role" shape with Arial 24pt Bold Red
+# After population with {"Role": "CTO"}, the text "CTO" will be Arial 24pt Bold Red
+```
+
+**Important Notes:**
+- Formatting is captured from the **first text run** in each shape
+- If a shape has multiple runs with different formatting, only the first run's formatting is preserved
+- For best results, format your template shapes with consistent styling
+- Empty template shapes with no existing text will use default formatting
+
+**Template Recommendations:**
+1. Add sample text to template shapes with your desired formatting
+2. Use the same font properties throughout a shape (not mixed formatting)
+3. Set colors using the standard color picker (RGB or theme colors)
+4. Test extraction to verify formatting appears correct
 
 ---
 
@@ -1442,10 +1500,25 @@ Still having issues?
 
 ## Changelog & Versioning
 
+**Version 2.0.0** (Current)
+- **Breaking Change:** Extract endpoint now returns ordered arrays instead of objects
+  - Single-slide extraction returns array of shape objects
+  - Multi-slide extraction uses `"shapes"` key instead of `"data"`
+  - Order of elements preserved as they appear on slides
+- **New:** Font formatting preservation for text and tables
+  - Preserves font name, size, bold, italic, underline, and color
+  - Applies to both text placeholders and table cells
+- **New:** Automatic placeholder cleanup when duplicating slides
+  - Removes unwanted "Title 1" and "Content Placeholder 2" from duplicates
+  - Only actual template content is copied to duplicate slides
+- **Enhancement:** Improved multi-slide duplication logic
+- **Enhancement:** Better error messages and validation
+
 **Version 1.0.0**
 - Initial release
 - Basic text and table population
 - Health check endpoint
+- Multi-slide support
 
 ---
 
