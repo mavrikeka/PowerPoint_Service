@@ -596,27 +596,25 @@ async def extract_data(
                 all_slides_data = []
 
                 for slide_idx, slide in enumerate(prs.slides):
-                    slide_data = {}
-                    shape_name_counters = {}  # Track duplicate shape names
+                    slide_shapes = []  # Ordered array of shapes
 
                     for shape in slide.shapes:
-                        shape_name = shape.name
-
-                        # Handle duplicate shape names by appending index
-                        if shape_name in slide_data:
-                            counter = shape_name_counters.get(shape_name, 1)
-                            unique_name = f"{shape_name}_{counter}"
-                            shape_name_counters[shape_name] = counter + 1
-                            shape_name = unique_name
+                        shape_data = {
+                            "name": shape.name,
+                            "type": None,
+                            "content": None
+                        }
 
                         if shape.has_table:
                             # Extract table data
+                            shape_data["type"] = "table"
                             table = shape.table
                             table_data = []
                             for row in table.rows:
                                 row_data = [cell.text for cell in row.cells]
                                 table_data.append(row_data)
-                            slide_data[shape_name] = table_data
+                            shape_data["content"] = table_data
+                            slide_shapes.append(shape_data)
                         else:
                             # Extract text data
                             text = None
@@ -626,11 +624,13 @@ async def extract_data(
                                 text = shape.text
 
                             if text:
-                                slide_data[shape_name] = text
+                                shape_data["type"] = "text"
+                                shape_data["content"] = text
+                                slide_shapes.append(shape_data)
 
                     all_slides_data.append({
                         "slide_index": slide_idx,
-                        "data": slide_data
+                        "shapes": slide_shapes
                     })
 
                 # Return populate-ready multi-slide format
@@ -647,27 +647,25 @@ async def extract_data(
                     )
 
                 slide = prs.slides[slide_index]
-                extracted_data = {}
-                shape_name_counters = {}  # Track duplicate shape names
+                slide_shapes = []  # Ordered array of shapes
 
                 for shape in slide.shapes:
-                    shape_name = shape.name
-
-                    # Handle duplicate shape names by appending index
-                    if shape_name in extracted_data:
-                        counter = shape_name_counters.get(shape_name, 1)
-                        unique_name = f"{shape_name}_{counter}"
-                        shape_name_counters[shape_name] = counter + 1
-                        shape_name = unique_name
+                    shape_data = {
+                        "name": shape.name,
+                        "type": None,
+                        "content": None
+                    }
 
                     if shape.has_table:
                         # Extract table data
+                        shape_data["type"] = "table"
                         table = shape.table
                         table_data = []
                         for row in table.rows:
                             row_data = [cell.text for cell in row.cells]
                             table_data.append(row_data)
-                        extracted_data[shape_name] = table_data
+                        shape_data["content"] = table_data
+                        slide_shapes.append(shape_data)
                     else:
                         # Extract text data
                         text = None
@@ -677,10 +675,12 @@ async def extract_data(
                             text = shape.text
 
                         if text:
-                            extracted_data[shape_name] = text
+                            shape_data["type"] = "text"
+                            shape_data["content"] = text
+                            slide_shapes.append(shape_data)
 
-                # Return populate-ready format (just the data, no wrapper)
-                return extracted_data
+                # Return ordered array of shapes
+                return slide_shapes
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error extracting data: {str(e)}")
