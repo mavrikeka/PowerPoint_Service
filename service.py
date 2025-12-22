@@ -63,12 +63,72 @@ def find_shape_by_name(slide, name):
 
 
 def populate_text_placeholder(shape, text):
-    """Populate a text placeholder with the given text."""
+    """
+    Populate a text placeholder with the given text while preserving formatting.
+
+    This function preserves font properties (name, size, bold, italic, color, etc.)
+    from the first run in the template, ensuring that explicit formatting set in
+    the template is maintained after population.
+    """
     if shape is None:
         return False
 
     if hasattr(shape, "text_frame"):
-        shape.text_frame.text = text
+        text_frame = shape.text_frame
+
+        # Check if there's existing content with formatting to preserve
+        if len(text_frame.paragraphs) > 0:
+            first_para = text_frame.paragraphs[0]
+
+            # Capture formatting from the first run if it exists
+            saved_font_props = None
+            if len(first_para.runs) > 0:
+                first_run = first_para.runs[0]
+                font = first_run.font
+
+                # Save all font properties (including None values which mean "inherit from theme")
+                saved_font_props = {
+                    'name': font.name,
+                    'size': font.size,
+                    'bold': font.bold,
+                    'italic': font.italic,
+                    'underline': font.underline,
+                    'color_type': font.color.type if hasattr(font.color, 'type') else None,
+                    'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
+                    'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
+                }
+
+            # Replace the text
+            text_frame.text = text
+
+            # Restore formatting to the new run if we saved properties
+            if saved_font_props and len(text_frame.paragraphs) > 0:
+                new_para = text_frame.paragraphs[0]
+                if len(new_para.runs) > 0:
+                    new_run = new_para.runs[0]
+                    new_font = new_run.font
+
+                    # Restore font properties (only set if they were explicitly set before)
+                    if saved_font_props['name'] is not None:
+                        new_font.name = saved_font_props['name']
+                    if saved_font_props['size'] is not None:
+                        new_font.size = saved_font_props['size']
+                    if saved_font_props['bold'] is not None:
+                        new_font.bold = saved_font_props['bold']
+                    if saved_font_props['italic'] is not None:
+                        new_font.italic = saved_font_props['italic']
+                    if saved_font_props['underline'] is not None:
+                        new_font.underline = saved_font_props['underline']
+
+                    # Restore color (RGB or theme color)
+                    if saved_font_props['color_rgb'] is not None:
+                        new_font.color.rgb = saved_font_props['color_rgb']
+                    elif saved_font_props['color_theme'] is not None:
+                        new_font.color.theme_color = saved_font_props['color_theme']
+        else:
+            # No existing content, just set the text
+            text_frame.text = text
+
         return True
     elif hasattr(shape, "text"):
         shape.text = text
@@ -79,7 +139,10 @@ def populate_text_placeholder(shape, text):
 
 def populate_table(table_shape, data, skip_header=True):
     """
-    Populate a table with data.
+    Populate a table with data while preserving cell formatting.
+
+    This function preserves font properties from table cells in the template,
+    ensuring that explicit formatting (font, size, color, etc.) is maintained.
 
     Args:
         table_shape: The shape containing the table
@@ -103,7 +166,53 @@ def populate_table(table_shape, data, skip_header=True):
                 break
 
             cell = table.cell(table_row_idx, col_idx)
+
+            # Save formatting from the first paragraph's first run
+            saved_font_props = None
+            if cell.text_frame and len(cell.text_frame.paragraphs) > 0:
+                first_para = cell.text_frame.paragraphs[0]
+                if len(first_para.runs) > 0:
+                    first_run = first_para.runs[0]
+                    font = first_run.font
+
+                    saved_font_props = {
+                        'name': font.name,
+                        'size': font.size,
+                        'bold': font.bold,
+                        'italic': font.italic,
+                        'underline': font.underline,
+                        'color_type': font.color.type if hasattr(font.color, 'type') else None,
+                        'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
+                        'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
+                    }
+
+            # Set the cell text
             cell.text = str(cell_value)
+
+            # Restore formatting if we saved it
+            if saved_font_props and cell.text_frame and len(cell.text_frame.paragraphs) > 0:
+                new_para = cell.text_frame.paragraphs[0]
+                if len(new_para.runs) > 0:
+                    new_run = new_para.runs[0]
+                    new_font = new_run.font
+
+                    # Restore font properties
+                    if saved_font_props['name'] is not None:
+                        new_font.name = saved_font_props['name']
+                    if saved_font_props['size'] is not None:
+                        new_font.size = saved_font_props['size']
+                    if saved_font_props['bold'] is not None:
+                        new_font.bold = saved_font_props['bold']
+                    if saved_font_props['italic'] is not None:
+                        new_font.italic = saved_font_props['italic']
+                    if saved_font_props['underline'] is not None:
+                        new_font.underline = saved_font_props['underline']
+
+                    # Restore color
+                    if saved_font_props['color_rgb'] is not None:
+                        new_font.color.rgb = saved_font_props['color_rgb']
+                    elif saved_font_props['color_theme'] is not None:
+                        new_font.color.theme_color = saved_font_props['color_theme']
 
     # Clear any remaining rows that weren't overwritten
     rows_populated = len(data) + start_row
