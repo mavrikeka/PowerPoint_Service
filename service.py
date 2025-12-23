@@ -97,6 +97,20 @@ def populate_text_placeholder(shape, text):
                     'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
                     'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
                 }
+            else:
+                # No runs (empty placeholder) - try to capture paragraph-level formatting
+                # This handles templates where formatting is set but text is empty
+                para_font = first_para.font
+                saved_font_props = {
+                    'name': para_font.name,
+                    'size': para_font.size,
+                    'bold': para_font.bold,
+                    'italic': para_font.italic,
+                    'underline': para_font.underline,
+                    'color_type': para_font.color.type if hasattr(para_font.color, 'type') else None,
+                    'color_rgb': para_font.color.rgb if (hasattr(para_font.color, 'type') and para_font.color.type == 1) else None,
+                    'color_theme': para_font.color.theme_color if (hasattr(para_font.color, 'theme_color')) else None,
+                }
 
             # Replace the text
             text_frame.text = text
@@ -184,6 +198,19 @@ def populate_table(table_shape, data, skip_header=True):
                         'color_type': font.color.type if hasattr(font.color, 'type') else None,
                         'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
                         'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
+                    }
+                else:
+                    # No runs (empty cell) - try to capture paragraph-level formatting
+                    para_font = first_para.font
+                    saved_font_props = {
+                        'name': para_font.name,
+                        'size': para_font.size,
+                        'bold': para_font.bold,
+                        'italic': para_font.italic,
+                        'underline': para_font.underline,
+                        'color_type': para_font.color.type if hasattr(para_font.color, 'type') else None,
+                        'color_rgb': para_font.color.rgb if (hasattr(para_font.color, 'type') and para_font.color.type == 1) else None,
+                        'color_theme': para_font.color.theme_color if (hasattr(para_font.color, 'theme_color')) else None,
                     }
 
             # Set the cell text
