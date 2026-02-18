@@ -62,13 +62,46 @@ def find_shape_by_name(slide, name):
     return None
 
 
+def _capture_font_props(font):
+    """Capture font properties from a python-pptx font object."""
+    return {
+        'name': font.name,
+        'size': font.size,
+        'bold': font.bold,
+        'italic': font.italic,
+        'underline': font.underline,
+        'color_type': font.color.type if hasattr(font.color, 'type') else None,
+        'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
+        'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
+    }
+
+
+def _apply_font_props(font, props):
+    """Apply saved font properties to a python-pptx font object."""
+    if props['name'] is not None:
+        font.name = props['name']
+    if props['size'] is not None:
+        font.size = props['size']
+    if props['bold'] is not None:
+        font.bold = props['bold']
+    if props['italic'] is not None:
+        font.italic = props['italic']
+    if props['underline'] is not None:
+        font.underline = props['underline']
+    if props['color_rgb'] is not None:
+        font.color.rgb = props['color_rgb']
+    elif props['color_theme'] is not None:
+        font.color.theme_color = props['color_theme']
+
+
 def populate_text_placeholder(shape, text):
     """
     Populate a text placeholder with the given text while preserving formatting.
 
-    This function preserves font properties (name, size, bold, italic, color, etc.)
-    from the first run in the template, ensuring that explicit formatting set in
-    the template is maintained after population.
+    Captures font properties from the template's first paragraph and applies them
+    to ALL paragraphs created after population (text with newlines creates multiple
+    paragraphs). Without this, only paragraph 0 gets the correct font — subsequent
+    paragraphs fall back to the PowerPoint theme default (typically 18pt).
     """
     if shape is None:
         return False
@@ -80,65 +113,26 @@ def populate_text_placeholder(shape, text):
         if len(text_frame.paragraphs) > 0:
             first_para = text_frame.paragraphs[0]
 
-            # Capture formatting from the first run if it exists
+            # Capture font from the first run if it exists, otherwise paragraph-level
             saved_font_props = None
             if len(first_para.runs) > 0:
-                first_run = first_para.runs[0]
-                font = first_run.font
-
-                # Save all font properties (including None values which mean "inherit from theme")
-                saved_font_props = {
-                    'name': font.name,
-                    'size': font.size,
-                    'bold': font.bold,
-                    'italic': font.italic,
-                    'underline': font.underline,
-                    'color_type': font.color.type if hasattr(font.color, 'type') else None,
-                    'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
-                    'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
-                }
+                saved_font_props = _capture_font_props(first_para.runs[0].font)
             else:
-                # No runs (empty placeholder) - try to capture paragraph-level formatting
-                # This handles templates where formatting is set but text is empty
-                para_font = first_para.font
-                saved_font_props = {
-                    'name': para_font.name,
-                    'size': para_font.size,
-                    'bold': para_font.bold,
-                    'italic': para_font.italic,
-                    'underline': para_font.underline,
-                    'color_type': para_font.color.type if hasattr(para_font.color, 'type') else None,
-                    'color_rgb': para_font.color.rgb if (hasattr(para_font.color, 'type') and para_font.color.type == 1) else None,
-                    'color_theme': para_font.color.theme_color if (hasattr(para_font.color, 'theme_color')) else None,
-                }
+                # No runs (empty placeholder) - capture paragraph-level formatting
+                saved_font_props = _capture_font_props(first_para.font)
 
-            # Replace the text
+            # Replace the text (may create multiple paragraphs if text contains newlines)
             text_frame.text = text
 
-            # Restore formatting to the new run if we saved properties
-            if saved_font_props and len(text_frame.paragraphs) > 0:
-                new_para = text_frame.paragraphs[0]
-                if len(new_para.runs) > 0:
-                    new_run = new_para.runs[0]
-                    new_font = new_run.font
-
-                    # Restore font properties (only set if they were explicitly set before)
-                    if saved_font_props['name'] is not None:
-                        new_font.name = saved_font_props['name']
-                    if saved_font_props['size'] is not None:
-                        new_font.size = saved_font_props['size']
-                    if saved_font_props['bold'] is not None:
-                        new_font.bold = saved_font_props['bold']
-                    if saved_font_props['italic'] is not None:
-                        new_font.italic = saved_font_props['italic']
-                    if saved_font_props['underline'] is not None:
-                        new_font.underline = saved_font_props['underline']
-
-                    # Restore color (RGB or theme color)
-                    if saved_font_props['color_rgb'] is not None:
-                        new_font.color.rgb = saved_font_props['color_rgb']
-                    elif saved_font_props['color_theme'] is not None:
-                        new_font.color.theme_color = saved_font_props['color_theme']
+            # Restore formatting to ALL paragraphs, not just the first.
+            # When text contains '\n', text_frame.text = text creates one paragraph
+            # per line. Only para[0] inherits the restored run properties; every
+            # subsequent paragraph gets a bare run with no font attributes, causing
+            # PowerPoint to fall back to the theme default (usually 18pt).
+            if saved_font_props:
+                for new_para in text_frame.paragraphs:
+                    if len(new_para.runs) > 0:
+                        _apply_font_props(new_para.runs[0].font, saved_font_props)
         else:
             # No existing content, just set the text
             text_frame.text = text
@@ -155,8 +149,10 @@ def populate_table(table_shape, data, skip_header=True):
     """
     Populate a table with data while preserving cell formatting.
 
-    This function preserves font properties from table cells in the template,
-    ensuring that explicit formatting (font, size, color, etc.) is maintained.
+    Captures font properties from each template cell and applies them to ALL
+    paragraphs in the populated cell. Table cells with multi-line content
+    (newlines in data) create multiple paragraphs; without restoring props to
+    every paragraph, subsequent ones fall back to the PowerPoint theme default.
 
     Args:
         table_shape: The shape containing the table
@@ -181,65 +177,23 @@ def populate_table(table_shape, data, skip_header=True):
 
             cell = table.cell(table_row_idx, col_idx)
 
-            # Save formatting from the first paragraph's first run
+            # Capture font from first run if present, otherwise paragraph-level
             saved_font_props = None
             if cell.text_frame and len(cell.text_frame.paragraphs) > 0:
                 first_para = cell.text_frame.paragraphs[0]
                 if len(first_para.runs) > 0:
-                    first_run = first_para.runs[0]
-                    font = first_run.font
-
-                    saved_font_props = {
-                        'name': font.name,
-                        'size': font.size,
-                        'bold': font.bold,
-                        'italic': font.italic,
-                        'underline': font.underline,
-                        'color_type': font.color.type if hasattr(font.color, 'type') else None,
-                        'color_rgb': font.color.rgb if (hasattr(font.color, 'type') and font.color.type == 1) else None,
-                        'color_theme': font.color.theme_color if (hasattr(font.color, 'theme_color')) else None,
-                    }
+                    saved_font_props = _capture_font_props(first_para.runs[0].font)
                 else:
-                    # No runs (empty cell) - try to capture paragraph-level formatting
-                    para_font = first_para.font
-                    saved_font_props = {
-                        'name': para_font.name,
-                        'size': para_font.size,
-                        'bold': para_font.bold,
-                        'italic': para_font.italic,
-                        'underline': para_font.underline,
-                        'color_type': para_font.color.type if hasattr(para_font.color, 'type') else None,
-                        'color_rgb': para_font.color.rgb if (hasattr(para_font.color, 'type') and para_font.color.type == 1) else None,
-                        'color_theme': para_font.color.theme_color if (hasattr(para_font.color, 'theme_color')) else None,
-                    }
+                    saved_font_props = _capture_font_props(first_para.font)
 
-            # Set the cell text
+            # Set the cell text (may create multiple paragraphs if value contains newlines)
             cell.text = str(cell_value)
 
-            # Restore formatting if we saved it
-            if saved_font_props and cell.text_frame and len(cell.text_frame.paragraphs) > 0:
-                new_para = cell.text_frame.paragraphs[0]
-                if len(new_para.runs) > 0:
-                    new_run = new_para.runs[0]
-                    new_font = new_run.font
-
-                    # Restore font properties
-                    if saved_font_props['name'] is not None:
-                        new_font.name = saved_font_props['name']
-                    if saved_font_props['size'] is not None:
-                        new_font.size = saved_font_props['size']
-                    if saved_font_props['bold'] is not None:
-                        new_font.bold = saved_font_props['bold']
-                    if saved_font_props['italic'] is not None:
-                        new_font.italic = saved_font_props['italic']
-                    if saved_font_props['underline'] is not None:
-                        new_font.underline = saved_font_props['underline']
-
-                    # Restore color
-                    if saved_font_props['color_rgb'] is not None:
-                        new_font.color.rgb = saved_font_props['color_rgb']
-                    elif saved_font_props['color_theme'] is not None:
-                        new_font.color.theme_color = saved_font_props['color_theme']
+            # Restore formatting to ALL paragraphs in the cell
+            if saved_font_props and cell.text_frame:
+                for new_para in cell.text_frame.paragraphs:
+                    if len(new_para.runs) > 0:
+                        _apply_font_props(new_para.runs[0].font, saved_font_props)
 
     # Clear any remaining rows that weren't overwritten
     rows_populated = len(data) + start_row
