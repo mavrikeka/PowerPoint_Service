@@ -12,9 +12,10 @@ import json
 import tempfile
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 import shutil
 from copy import deepcopy
+import re
 
 app = FastAPI(
     title="PowerPoint Population Service",
@@ -30,6 +31,184 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ============================================================================
+# Markdown Formatting Support
+# ============================================================================
+
+# Compiled regex patterns for markdown inline formatting
+# Priority order: longest match first (all three → two → one)
+# Using .*? instead of .+? to match empty content (e.g., ****)
+# Using re.DOTALL to match across newlines
+MARKDOWN_PATTERNS = [
+    # All three (bold + italic + underline)
+    (re.compile(r'(?<!\\)\*\*\*__(.*?)__\*\*\*', re.DOTALL), 'bold_italic_underline'),  # ***__text__***
+    (re.compile(r'(?<!\\)__\*\*\*(.*?)\*\*\*__', re.DOTALL), 'bold_italic_underline'),  # __***text***__
+
+    # Two combinations
+    (re.compile(r'(?<!\\)\*\*__(.*?)__\*\*', re.DOTALL), 'bold_underline'),   # **__text__**
+    (re.compile(r'(?<!\\)__\*\*(.*?)\*\*__', re.DOTALL), 'bold_underline'),   # __**text**__
+    (re.compile(r'(?<!\\)\*__(.*?)__\*', re.DOTALL), 'italic_underline'),     # *__text__*
+    (re.compile(r'(?<!\\)__\*(.*?)\*__', re.DOTALL), 'italic_underline'),     # __*text*__
+    (re.compile(r'(?<!\\)\*\*\*(.*?)\*\*\*', re.DOTALL), 'bold_italic'),      # ***text***
+
+    # Single formats
+    (re.compile(r'(?<!\\)\*\*(.*?)\*\*', re.DOTALL), 'bold'),                 # **text**
+    (re.compile(r'(?<!\\)__(.*?)__', re.DOTALL), 'underline'),                # __text__
+    (re.compile(r'(?<!\\)\*(.*?)\*', re.DOTALL), 'italic'),                   # *text*
+]
+
+
+def _has_markdown(text: str) -> bool:
+    """
+    Quick check if text contains markdown formatting.
+    Returns True if text contains unescaped markdown markers.
+
+    This is an optimization to avoid regex parsing for plain text.
+    """
+    # Quick check - avoid regex if no markdown characters present
+    if not any(c in text for c in ['*', '_']):
+        return False
+
+    # More thorough check only if needed
+    return bool(re.search(r'(?<!\\)(\*\*|\*|__)', text))
+
+
+def _parse_markdown_inline(text: str) -> List[Dict]:
+    """
+    Parse text into segments with formatting information.
+
+    Returns:
+        List of dicts with 'text', 'bold', 'italic', 'underline' keys.
+        Example:
+        [
+            {"text": "Plain text ", "bold": False, "italic": False, "underline": False},
+            {"text": "bold text", "bold": True, "italic": False, "underline": False},
+            {"text": " more plain", "bold": False, "italic": False, "underline": False}
+        ]
+    """
+    segments = []
+    matches = []
+
+    # Find all markdown patterns
+    for pattern, format_type in MARKDOWN_PATTERNS:
+        for match in pattern.finditer(text):
+            matches.append({
+                'start': match.start(),
+                'end': match.end(),
+                'text': match.group(1),  # The captured text without markers
+                'format_type': format_type,
+                'full_match': match.group(0)
+            })
+
+    # Sort by start position
+    matches.sort(key=lambda x: x['start'])
+
+    # Remove overlapping matches (first match wins)
+    filtered_matches = []
+    last_end = 0
+    for match in matches:
+        if match['start'] >= last_end:
+            filtered_matches.append(match)
+            last_end = match['end']
+
+    # Build segments
+    current_pos = 0
+    for match in filtered_matches:
+        # Add plain text before this match
+        if match['start'] > current_pos:
+            plain_text = text[current_pos:match['start']]
+            if plain_text:
+                segments.append({
+                    'text': plain_text,
+                    'bold': False,
+                    'italic': False,
+                    'underline': False
+                })
+
+        # Add formatted text
+        format_type = match['format_type']
+        segments.append({
+            'text': match['text'],
+            'bold': 'bold' in format_type,
+            'italic': 'italic' in format_type,
+            'underline': 'underline' in format_type
+        })
+
+        current_pos = match['end']
+
+    # Add remaining plain text
+    if current_pos < len(text):
+        remaining_text = text[current_pos:]
+        if remaining_text:
+            segments.append({
+                'text': remaining_text,
+                'bold': False,
+                'italic': False,
+                'underline': False
+            })
+
+    # Handle escaped characters in all segments
+    for segment in segments:
+        segment['text'] = segment['text'].replace(r'\*', '*').replace(r'\_', '_')
+
+    return segments if segments else [{'text': text, 'bold': False, 'italic': False, 'underline': False}]
+
+
+def _apply_markdown_to_paragraph(paragraph, segments: List[Dict], font_props: Dict):
+    """
+    Apply parsed markdown segments to a paragraph.
+    Creates runs for each segment and applies formatting.
+
+    Args:
+        paragraph: pptx paragraph object
+        segments: List of dicts from _parse_markdown_inline
+        font_props: Font properties from template
+    """
+    for segment in segments:
+        run = paragraph.add_run()
+        run.text = segment['text']
+
+        # Apply template font properties first
+        if font_props:
+            _apply_font_props(run.font, font_props)
+
+        # Apply markdown formatting on top of template properties
+        if segment['bold']:
+            run.font.bold = True
+        if segment['italic']:
+            run.font.italic = True
+        if segment['underline']:
+            run.font.underline = True
+
+
+def _parse_and_apply_markdown(text_frame, text: str, saved_font_props: Dict):
+    """
+    Main markdown processing function.
+    Handles multi-paragraph text (newlines) and applies formatting.
+
+    Args:
+        text_frame: pptx text frame object
+        text: Text with markdown formatting
+        saved_font_props: Font properties from template
+    """
+    # Clear existing content
+    text_frame.clear()
+
+    # Split by newlines to handle multiple paragraphs
+    lines = text.split('\n')
+
+    for i, line in enumerate(lines):
+        # Add paragraph (first one already exists)
+        if i == 0:
+            paragraph = text_frame.paragraphs[0]
+        else:
+            paragraph = text_frame.add_paragraph()
+
+        # Parse and apply markdown for this line
+        segments = _parse_markdown_inline(line)
+        _apply_markdown_to_paragraph(paragraph, segments, saved_font_props)
 
 
 def find_shape_by_name(slide, name):
@@ -98,10 +277,18 @@ def populate_text_placeholder(shape, text):
     """
     Populate a text placeholder with the given text while preserving formatting.
 
+    Supports markdown inline formatting:
+    - **bold** → bold text
+    - *italic* → italic text
+    - __underline__ → underlined text
+    - ***bold italic*** → bold and italic
+    - **__bold underline__** → bold and underlined
+    - *__italic underline__* → italic and underlined
+    - ***__all three__*** → bold, italic, and underlined
+
     Captures font properties from the template's first paragraph and applies them
-    to ALL paragraphs created after population (text with newlines creates multiple
-    paragraphs). Without this, only paragraph 0 gets the correct font — subsequent
-    paragraphs fall back to the PowerPoint theme default (typically 18pt).
+    to ALL paragraphs/runs created after population. If markdown is detected, creates
+    separate runs for each formatted segment. Otherwise, uses fast-path plain text.
     """
     if shape is None:
         return False
@@ -121,18 +308,23 @@ def populate_text_placeholder(shape, text):
                 # No runs (empty placeholder) - capture paragraph-level formatting
                 saved_font_props = _capture_font_props(first_para.font)
 
-            # Replace the text (may create multiple paragraphs if text contains newlines)
-            text_frame.text = text
+            # Check if text contains markdown formatting
+            if _has_markdown(text):
+                # Markdown path - parse and apply formatting
+                _parse_and_apply_markdown(text_frame, text, saved_font_props)
+            else:
+                # Fast path for plain text - existing behavior (zero overhead)
+                text_frame.text = text
 
-            # Restore formatting to ALL paragraphs, not just the first.
-            # When text contains '\n', text_frame.text = text creates one paragraph
-            # per line. Only para[0] inherits the restored run properties; every
-            # subsequent paragraph gets a bare run with no font attributes, causing
-            # PowerPoint to fall back to the theme default (usually 18pt).
-            if saved_font_props:
-                for new_para in text_frame.paragraphs:
-                    if len(new_para.runs) > 0:
-                        _apply_font_props(new_para.runs[0].font, saved_font_props)
+                # Restore formatting to ALL paragraphs, not just the first.
+                # When text contains '\n', text_frame.text = text creates one paragraph
+                # per line. Only para[0] inherits the restored run properties; every
+                # subsequent paragraph gets a bare run with no font attributes, causing
+                # PowerPoint to fall back to the theme default (usually 18pt).
+                if saved_font_props:
+                    for new_para in text_frame.paragraphs:
+                        if len(new_para.runs) > 0:
+                            _apply_font_props(new_para.runs[0].font, saved_font_props)
         else:
             # No existing content, just set the text
             text_frame.text = text
@@ -148,6 +340,8 @@ def populate_text_placeholder(shape, text):
 def populate_table(table_shape, data, skip_header=True):
     """
     Populate a table with data while preserving cell formatting.
+
+    Supports markdown inline formatting in table cells (same as text placeholders).
 
     Captures font properties from each template cell and applies them to ALL
     paragraphs in the populated cell. Table cells with multi-line content
@@ -176,6 +370,7 @@ def populate_table(table_shape, data, skip_header=True):
                 break
 
             cell = table.cell(table_row_idx, col_idx)
+            cell_text = str(cell_value)
 
             # Capture font from first run if present, otherwise paragraph-level
             saved_font_props = None
@@ -186,14 +381,19 @@ def populate_table(table_shape, data, skip_header=True):
                 else:
                     saved_font_props = _capture_font_props(first_para.font)
 
-            # Set the cell text (may create multiple paragraphs if value contains newlines)
-            cell.text = str(cell_value)
+            # Check if cell text contains markdown formatting
+            if cell.text_frame and _has_markdown(cell_text):
+                # Markdown path - parse and apply formatting
+                _parse_and_apply_markdown(cell.text_frame, cell_text, saved_font_props)
+            else:
+                # Fast path for plain text
+                cell.text = cell_text
 
-            # Restore formatting to ALL paragraphs in the cell
-            if saved_font_props and cell.text_frame:
-                for new_para in cell.text_frame.paragraphs:
-                    if len(new_para.runs) > 0:
-                        _apply_font_props(new_para.runs[0].font, saved_font_props)
+                # Restore formatting to ALL paragraphs in the cell
+                if saved_font_props and cell.text_frame:
+                    for new_para in cell.text_frame.paragraphs:
+                        if len(new_para.runs) > 0:
+                            _apply_font_props(new_para.runs[0].font, saved_font_props)
 
     # Clear any remaining rows that weren't overwritten
     rows_populated = len(data) + start_row
